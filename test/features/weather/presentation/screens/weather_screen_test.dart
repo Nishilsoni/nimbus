@@ -5,6 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:nimbus/core/constants/app_strings.dart';
 import 'package:nimbus/core/error/failures.dart';
+import 'package:nimbus/core/widgets/tactile/tactile_pressable.dart';
+import 'package:nimbus/features/appearance/domain/appearance_mode.dart';
+import 'package:nimbus/features/appearance/domain/appearance_repository.dart';
+import 'package:nimbus/features/appearance/presentation/appearance_cubit.dart';
 import 'package:nimbus/features/weather/presentation/cubit/weather_cubit.dart';
 import 'package:nimbus/features/weather/presentation/cubit/weather_state.dart';
 import 'package:nimbus/features/weather/presentation/screens/weather_screen.dart';
@@ -18,6 +22,14 @@ import '../../../../helpers/test_data.dart';
 
 class _MockWeatherCubit extends MockCubit<WeatherState>
     implements WeatherCubit {}
+
+class _FixedAppearance implements AppearanceRepository {
+  @override
+  AppearanceMode load() => AppearanceMode.automatic;
+
+  @override
+  Future<void> save(AppearanceMode mode) async {}
+}
 
 void main() {
   late _MockWeatherCubit cubit;
@@ -37,15 +49,20 @@ void main() {
     when(() => cubit.state).thenReturn(state);
     await tester.pumpWidget(
       MaterialApp(
-        home: BlocProvider<WeatherCubit>.value(
-          value: cubit,
+        home: MultiBlocProvider(
+          providers: [
+            BlocProvider<WeatherCubit>.value(value: cubit),
+            BlocProvider(create: (_) => AppearanceCubit(_FixedAppearance())),
+          ],
           child: const WeatherScreen(),
         ),
       ),
     );
-    // The illustration animates forever, so pump a fixed time rather than
-    // waiting to settle.
-    await tester.pump(const Duration(milliseconds: 600));
+    // The illustration animates forever, so pump fixed times rather than
+    // waiting to settle: first to fire every staggered entrance's start
+    // timer, then to let those entrances and the counting temperature end.
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 1500));
   }
 
   testWidgets('shows the welcome view before any city is chosen', (
@@ -124,13 +141,14 @@ void main() {
   testWidgets('disables the refresh button while refreshing', (tester) async {
     await pumpScreen(tester, showingData.copyWith(isRefreshing: true));
 
-    final button = tester.widget<IconButton>(
-      find.ancestor(
-        of: find.byType(CircularProgressIndicator),
-        matching: find.byType(IconButton),
+    final button = tester.widget<TactilePressable>(
+      find.descendant(
+        of: find.byTooltip(AppStrings.refreshing),
+        matching: find.byType(TactilePressable),
       ),
     );
     expect(button.onPressed, isNull);
+    expect(button.isActive, isTrue);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
   });
 

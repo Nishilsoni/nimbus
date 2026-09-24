@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:nimbus/core/constants/app_strings.dart';
 import 'package:nimbus/core/widgets/skeleton.dart';
+import 'package:nimbus/core/widgets/tactile/tactile_surface.dart';
 
 /// A skeleton with the same layout as [WeatherContent], so the real data
-/// fades in where the placeholders were instead of jumping into place.
+/// settles in where the placeholders were instead of jumping into place.
 class LoadingView extends StatelessWidget {
   const LoadingView({super.key});
 
@@ -14,19 +15,27 @@ class LoadingView extends StatelessWidget {
       child: const SkeletonPulse(
         child: Column(
           children: [
-            SizedBox(height: 20),
-            SkeletonBox(width: 160, height: 160, radius: 80),
-            SizedBox(height: 28),
-            SkeletonBox(width: 150, height: 84, radius: 20),
-            SizedBox(height: 14),
+            SizedBox(height: 16),
+            TactileSurface(
+              circle: true,
+              distance: 14,
+              child: SizedBox.square(
+                dimension: 236,
+                child: Padding(
+                  padding: EdgeInsets.all(18),
+                  child: SkeletonBox(height: 200, circle: true),
+                ),
+              ),
+            ),
+            SizedBox(height: 32),
+            SkeletonBox(width: 150, height: 80, radius: 24),
+            SizedBox(height: 16),
             SkeletonBox(width: 120, height: 22),
-            SizedBox(height: 10),
-            SkeletonBox(width: 110, height: 16),
+            SizedBox(height: 16),
+            SkeletonBox(width: 150, height: 36, radius: 20),
             SizedBox(height: 40),
             _SkeletonRow(),
-            SizedBox(height: 12),
-            _SkeletonRow(),
-            SizedBox(height: 12),
+            SizedBox(height: 18),
             _SkeletonRow(),
           ],
         ),
@@ -42,9 +51,9 @@ class _SkeletonRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Row(
       children: [
-        Expanded(child: SkeletonBox(height: 92, radius: 20)),
-        SizedBox(width: 12),
-        Expanded(child: SkeletonBox(height: 92, radius: 20)),
+        Expanded(child: SkeletonBox(height: 104, radius: 24)),
+        SizedBox(width: 18),
+        Expanded(child: SkeletonBox(height: 104, radius: 24)),
       ],
     );
   }

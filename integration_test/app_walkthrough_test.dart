@@ -5,6 +5,8 @@ import 'package:nimbus/app/app.dart';
 import 'package:nimbus/app/dependencies.dart';
 import 'package:nimbus/core/constants/app_strings.dart';
 import 'package:nimbus/core/network/network_info.dart';
+import 'package:nimbus/features/appearance/data/appearance_repository_impl.dart';
+import 'package:nimbus/features/appearance/domain/appearance_mode.dart';
 import 'package:nimbus/features/weather/presentation/widgets/empty_view.dart';
 import 'package:nimbus/features/weather/presentation/widgets/refresh_status_banner.dart';
 import 'package:nimbus/features/weather/presentation/widgets/weather_content.dart';
@@ -60,12 +62,19 @@ void main() {
   }
 
   testWidgets('search, refresh failure, recovery and GPS', (tester) async {
-    await (await SharedPreferences.getInstance()).clear();
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.clear();
+    // Start in light mode so the screenshots don't depend on the time of
+    // day; the dark look is captured at the end.
+    await preferences.setString(
+      AppearanceRepositoryImpl.storageKey,
+      AppearanceMode.light.name,
+    );
     final network = _SwitchableNetworkInfo();
     final dependencies = await AppDependencies.create(networkInfo: network);
 
     await tester.pumpWidget(NimbusApp(dependencies: dependencies));
-    await pumpFor(tester, const Duration(milliseconds: 1500));
+    await pumpFor(tester, const Duration(milliseconds: 2000));
     await screenshot('01_splash');
 
     // First launch: nothing cached, so the welcome view is shown.
@@ -122,9 +131,16 @@ void main() {
     await pumpUntil(tester, find.byIcon(Icons.near_me_rounded));
     await pumpFor(tester, const Duration(seconds: 1));
     await screenshot('08_current_location');
+
+    // The appearance toggle switches the whole app to the dark look.
+    await tester.tap(find.byTooltip(AppStrings.appearanceLight));
+    await pumpUntil(tester, find.byTooltip(AppStrings.appearanceDark));
+    await pumpFor(tester, const Duration(milliseconds: 1500));
+    await screenshot('09_dark_mode');
   });
 
-  // Runs after the walkthrough, whose last successful fetch is now cached.
+  // Runs after the walkthrough, whose last successful fetch is now cached
+  // and whose dark appearance choice is remembered.
   testWidgets('opening the app offline shows the cached weather', (
     tester,
   ) async {
@@ -138,6 +154,7 @@ void main() {
     expect(find.byType(WeatherContent), findsOneWidget);
     expect(find.byIcon(Icons.near_me_rounded), findsOneWidget);
     expect(find.text(AppStrings.noInternetTitle), findsOneWidget);
-    await screenshot('09_offline_cached');
+    expect(find.byTooltip(AppStrings.appearanceDark), findsOneWidget);
+    await screenshot('10_offline_cached');
   });
 }

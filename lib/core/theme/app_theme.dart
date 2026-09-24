@@ -1,75 +1,68 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-import 'package:nimbus/core/theme/app_colors.dart';
-import 'package:nimbus/core/theme/app_text_styles.dart';
+import 'package:nimbus/core/theme/surface_palette.dart';
 
 abstract final class AppTheme {
-  static const systemOverlayStyle = SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    statusBarBrightness: Brightness.dark,
-    systemNavigationBarColor: Colors.transparent,
-    systemNavigationBarIconBrightness: Brightness.light,
-  );
-
-  static ThemeData get dark {
+  /// Builds the whole Material theme from a surface palette, so one
+  /// palette change restyles (and animates) everything.
+  static ThemeData fromPalette(SurfacePalette palette) {
+    final brightness = palette.isDark ? Brightness.dark : Brightness.light;
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.brandBlue,
-      brightness: Brightness.dark,
-      surface: AppColors.brandNavy,
+      seedColor: palette.accent,
+      brightness: brightness,
+      primary: palette.accent,
+      onPrimary: palette.onAccent,
+      surface: palette.base,
+      onSurface: palette.textPrimary,
+    );
+    final baseTheme = ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      colorScheme: colorScheme,
     );
 
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppColors.brandNavy,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: AppColors.textPrimary,
-        systemOverlayStyle: systemOverlayStyle,
+    return baseTheme.copyWith(
+      scaffoldBackgroundColor: palette.base,
+      canvasColor: palette.base,
+      extensions: [palette],
+      // Depth, not ink ripples, is the press feedback in this design.
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
+      textTheme: baseTheme.textTheme.apply(
+        bodyColor: palette.textPrimary,
+        displayColor: palette.textPrimary,
       ),
-      iconTheme: const IconThemeData(color: AppColors.textPrimary),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: AppColors.textPrimary,
+      iconTheme: IconThemeData(color: palette.textPrimary),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: palette.accent,
         linearTrackColor: Colors.transparent,
-        refreshBackgroundColor: AppColors.brandNavy,
+        refreshBackgroundColor: palette.base,
       ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.textPrimary,
-          foregroundColor: AppColors.brandNavy,
-          textStyle: AppTextStyles.bodyStrong,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: const StadiumBorder(),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: palette.accent,
+        selectionColor: palette.accent.withValues(alpha: 0.3),
+        selectionHandleColor: palette.accent,
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: palette.textPrimary,
+          borderRadius: BorderRadius.circular(8),
         ),
+        textStyle: TextStyle(color: palette.base, fontSize: 12),
       ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.textPrimary,
-          textStyle: AppTextStyles.bodyStrong,
-          side: const BorderSide(color: AppColors.glassBorder, width: 1.5),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: const StadiumBorder(),
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: AppColors.textPrimary),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.glassFill,
-        hintStyle: AppTextStyles.body.copyWith(color: AppColors.textMuted),
-        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
-      ),
-      textSelectionTheme: const TextSelectionThemeData(
-        cursorColor: AppColors.textPrimary,
-      ),
+    );
+  }
+
+  /// Status and navigation bar icons that stay readable on [palette].
+  static SystemUiOverlayStyle overlayStyleFor(SurfacePalette palette) {
+    final iconBrightness = palette.isDark ? Brightness.light : Brightness.dark;
+    return SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: iconBrightness,
+      // iOS names the bar's background brightness, the opposite of icons.
+      statusBarBrightness: palette.isDark ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: iconBrightness,
     );
   }
 }

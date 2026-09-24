@@ -10,6 +10,11 @@ abstract final class AppStrings {
   static const refresh = 'Refresh';
   static const refreshing = 'Refreshing…';
   static const loadingWeather = 'Loading weather';
+
+  // Appearance
+  static const appearanceAutomatic = 'Theme: automatic (day and night)';
+  static const appearanceLight = 'Theme: light';
+  static const appearanceDark = 'Theme: dark';
   static const dismiss = 'Dismiss';
   static const welcomeTitle = 'Welcome to Nimbus';
   static const welcomeMessage =

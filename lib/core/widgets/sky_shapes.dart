@@ -127,8 +127,8 @@ abstract final class SkyShapes {
     canvas.drawPath(
       path.shift(Offset(0, unit * 0.04)),
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.12)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, unit * 0.04),
+        ..color = Colors.black.withValues(alpha: 0.18)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, unit * 0.05),
     );
 
     final bounds = path.getBounds();
@@ -166,12 +166,21 @@ abstract final class SkyShapes {
     double radius,
     double opacity,
   ) {
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..color = AppColors.snowflake.withValues(alpha: opacity.clamp(0, 1)),
-    );
+    final alpha = opacity.clamp(0.0, 1.0);
+    // A soft shadow keeps white flakes visible on light surfaces.
+    canvas
+      ..drawCircle(
+        center + Offset(0, radius * 0.3),
+        radius,
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.18 * alpha)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius * 0.6),
+      )
+      ..drawCircle(
+        center,
+        radius,
+        Paint()..color = AppColors.snowflake.withValues(alpha: alpha),
+      );
   }
 
   /// A lightning bolt [height] tall hanging from [top].

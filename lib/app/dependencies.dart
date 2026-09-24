@@ -2,6 +2,8 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:nimbus/core/network/api_client.dart';
 import 'package:nimbus/core/network/network_info.dart';
+import 'package:nimbus/features/appearance/data/appearance_repository_impl.dart';
+import 'package:nimbus/features/appearance/domain/appearance_repository.dart';
 import 'package:nimbus/features/weather/data/datasources/device_location_data_source.dart';
 import 'package:nimbus/features/weather/data/datasources/geocoding_remote_data_source.dart';
 import 'package:nimbus/features/weather/data/datasources/weather_local_data_source.dart';
@@ -21,10 +23,12 @@ class AppDependencies {
   const AppDependencies({
     required this.weatherRepository,
     required this.locationRepository,
+    required this.appearanceRepository,
   });
 
   final WeatherRepository weatherRepository;
   final LocationRepository locationRepository;
+  final AppearanceRepository appearanceRepository;
 
   static Future<AppDependencies> create({NetworkInfo? networkInfo}) async {
     final preferences = await SharedPreferences.getInstance();
@@ -40,6 +44,7 @@ class AppDependencies {
         local: WeatherLocalDataSource(preferences),
       ),
       locationRepository: LocationRepositoryImpl(DeviceLocationDataSource()),
+      appearanceRepository: AppearanceRepositoryImpl(preferences),
     );
   }
 }

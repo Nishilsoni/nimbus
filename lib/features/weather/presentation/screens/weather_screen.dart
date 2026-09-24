@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:nimbus/core/theme/app_colors.dart';
 import 'package:nimbus/core/theme/app_theme.dart';
-import 'package:nimbus/core/widgets/gradient_background.dart';
+import 'package:nimbus/core/theme/surface_palette.dart';
+import 'package:nimbus/core/widgets/motion/smooth_switcher.dart';
+import 'package:nimbus/core/widgets/tactile/tactile_progress_bar.dart';
 import 'package:nimbus/features/weather/presentation/cubit/weather_cubit.dart';
 import 'package:nimbus/features/weather/presentation/cubit/weather_state.dart';
 import 'package:nimbus/features/weather/presentation/screens/city_search_screen.dart';
-import 'package:nimbus/features/weather/presentation/utils/condition_visuals.dart';
 import 'package:nimbus/features/weather/presentation/utils/failure_display.dart';
 import 'package:nimbus/features/weather/presentation/widgets/empty_view.dart';
 import 'package:nimbus/features/weather/presentation/widgets/error_view.dart';
@@ -27,56 +27,50 @@ class WeatherScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final cubit = context.read<WeatherCubit>();
 
-    return BlocBuilder<WeatherCubit, WeatherState>(
-      builder: (context, state) {
-        final report = state.report;
-        final skyColors =
-            report?.weather.condition.skyGradient(
-              isDay: report.weather.isDay,
-            ) ??
-            AppColors.brandGradient;
-
-        return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: AppTheme.systemOverlayStyle,
-          child: Scaffold(
-            body: GradientBackground(
-              colors: skyColors,
-              child: SafeArea(
-                bottom: false,
-                child: Column(
-                  children: [
-                    WeatherHeader(
-                      city: report?.city,
-                      fetchedAt: report?.fetchedAt,
-                      isRefreshing: state.isBusy,
-                      onSearch: () => _openSearch(context),
-                      onUseLocation: cubit.useCurrentLocation,
-                      onRefresh: state.status == WeatherStatus.initial
-                          ? null
-                          : cubit.refresh,
-                    ),
-                    _RefreshProgressBar(visible: state.isRefreshing),
-                    Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: cubit.refresh,
-                        // Nothing to refresh before a city has been chosen.
-                        notificationPredicate: (notification) =>
-                            state.status != WeatherStatus.initial &&
-                            defaultScrollNotificationPredicate(notification),
-                        child: _AlwaysScrollable(
-                          resetKey: report?.city,
-                          builder: (viewportHeight) =>
-                              _buildBody(context, state, viewportHeight),
-                        ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: AppTheme.overlayStyleFor(context.palette),
+      child: Scaffold(
+        body: BlocBuilder<WeatherCubit, WeatherState>(
+          builder: (context, state) {
+            final report = state.report;
+            return SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  WeatherHeader(
+                    city: report?.city,
+                    fetchedAt: report?.fetchedAt,
+                    isRefreshing: state.isBusy,
+                    onSearch: () => _openSearch(context),
+                    onUseLocation: cubit.useCurrentLocation,
+                    onRefresh: state.status == WeatherStatus.initial
+                        ? null
+                        : cubit.refresh,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 6, 24, 0),
+                    child: TactileProgressBar(isVisible: state.isRefreshing),
+                  ),
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: cubit.refresh,
+                      // Nothing to refresh before a city has been chosen.
+                      notificationPredicate: (notification) =>
+                          state.status != WeatherStatus.initial &&
+                          defaultScrollNotificationPredicate(notification),
+                      child: _AlwaysScrollable(
+                        resetKey: report?.city,
+                        builder: (viewportHeight) =>
+                            _buildBody(context, state, viewportHeight),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ),
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -95,19 +89,26 @@ class WeatherScreen extends StatelessWidget {
         key: ValueKey(report.city),
         children: [
           AnimatedSize(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-            child: failure == null
-                ? const SizedBox(width: double.infinity)
-                : Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: RefreshStatusBanner(
-                      failure: failure,
-                      lastUpdated: report.fetchedAt,
-                      onAction: () => _handleFailureAction(context, state),
-                      onDismiss: cubit.dismissFailure,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+            child: SmoothSwitcher(
+              alignment: Alignment.topCenter,
+              child: failure == null
+                  ? const SizedBox(
+                      key: ValueKey('no-banner'),
+                      width: double.infinity,
+                    )
+                  : Padding(
+                      key: ValueKey(failure),
+                      padding: const EdgeInsets.only(top: 8, bottom: 12),
+                      child: RefreshStatusBanner(
+                        failure: failure,
+                        lastUpdated: report.fetchedAt,
+                        onAction: () => _handleFailureAction(context, state),
+                        onDismiss: cubit.dismissFailure,
+                      ),
                     ),
-                  ),
+            ),
           ),
           WeatherContent(report: report),
         ],
@@ -133,24 +134,9 @@ class WeatherScreen extends StatelessWidget {
       );
     }
 
-    return AnimatedSwitcher(
+    return SmoothSwitcher(
       duration: const Duration(milliseconds: 450),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
-      layoutBuilder: (current, previous) => Stack(
-        alignment: Alignment.topCenter,
-        children: [...previous, ?current],
-      ),
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: SlideTransition(
-          position: Tween(
-            begin: const Offset(0, 0.03),
-            end: Offset.zero,
-          ).animate(animation),
-          child: child,
-        ),
-      ),
+      alignment: Alignment.topCenter,
       child: body,
     );
   }
@@ -172,26 +158,6 @@ class WeatherScreen extends StatelessWidget {
   }
 }
 
-/// A thin progress line under the header while data on screen is being
-/// refreshed.
-class _RefreshProgressBar extends StatelessWidget {
-  const _RefreshProgressBar({required this.visible});
-
-  final bool visible;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      opacity: visible ? 1 : 0,
-      duration: const Duration(milliseconds: 250),
-      child: SizedBox(
-        height: 2,
-        child: visible ? const LinearProgressIndicator(minHeight: 2) : null,
-      ),
-    );
-  }
-}
-
 /// Makes its content scrollable even when it's shorter than the screen, so
 /// pull-to-refresh works in every state, including the error view.
 class _AlwaysScrollable extends StatefulWidget {
@@ -209,7 +175,8 @@ class _AlwaysScrollable extends StatefulWidget {
 }
 
 class _AlwaysScrollableState extends State<_AlwaysScrollable> {
-  static const _padding = EdgeInsets.fromLTRB(20, 12, 20, 32);
+  /// Generous side padding: the soft shadows need room to fall.
+  static const _padding = EdgeInsets.fromLTRB(24, 12, 24, 40);
 
   final _controller = ScrollController();
 
@@ -220,7 +187,7 @@ class _AlwaysScrollableState extends State<_AlwaysScrollable> {
       unawaited(
         _controller.animateTo(
           0,
-          duration: const Duration(milliseconds: 400),
+          duration: const Duration(milliseconds: 500),
           curve: Curves.easeOutCubic,
         ),
       );
@@ -242,7 +209,10 @@ class _AlwaysScrollableState extends State<_AlwaysScrollable> {
             constraints.maxHeight - _padding.vertical - bottomInset;
         return SingleChildScrollView(
           controller: _controller,
-          physics: const AlwaysScrollableScrollPhysics(),
+          // A soft bounce on every platform suits the tactile design.
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           padding: _padding.copyWith(bottom: _padding.bottom + bottomInset),
           child: widget.builder(viewportHeight.clamp(0, double.infinity)),
         );

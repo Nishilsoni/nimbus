@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nimbus/core/constants/app_strings.dart';
 import 'package:nimbus/core/navigation/circular_reveal_route.dart';
-import 'package:nimbus/core/theme/app_colors.dart';
 import 'package:nimbus/core/theme/app_text_styles.dart';
 import 'package:nimbus/core/theme/app_theme.dart';
-import 'package:nimbus/core/widgets/gradient_background.dart';
+import 'package:nimbus/core/theme/surface_palette.dart';
+import 'package:nimbus/core/widgets/tactile/tactile_surface.dart';
 import 'package:nimbus/features/splash/presentation/widgets/animated_logo.dart';
 import 'package:nimbus/features/weather/presentation/screens/weather_screen.dart';
 
-/// Plays the logo animation, then reveals the weather screen through a
-/// circle that grows out of the logo's sun.
+/// A disc rises out of the surface, the sun and cloud settle into it, and
+/// the name appears letter by letter. Then the weather screen is revealed
+/// through a circle growing out of the sun.
 ///
 /// The splash doesn't pretend to load anything. The weather cubit starts
 /// reading the cache the moment the app launches, so by the time the
@@ -30,17 +31,22 @@ class _SplashScreenState extends State<SplashScreen>
     vsync: this,
     duration: _reduceMotion
         ? const Duration(milliseconds: 400)
-        : const Duration(milliseconds: 1900),
+        : const Duration(milliseconds: 2200),
   );
 
-  late final Animation<double> _wordmark = CurvedAnimation(
+  late final Animation<double> _discRise = CurvedAnimation(
     parent: _intro,
-    curve: const Interval(0.50, 0.90, curve: Curves.easeOutCubic),
+    curve: const Interval(0, 0.35, curve: Curves.easeOutCubic),
+  );
+
+  late final Animation<double> _logo = CurvedAnimation(
+    parent: _intro,
+    curve: const Interval(0.15, 0.85),
   );
 
   late final Animation<double> _tagline = CurvedAnimation(
     parent: _intro,
-    curve: const Interval(0.65, 1, curve: Curves.easeOut),
+    curve: const Interval(0.78, 1, curve: Curves.easeOut),
   );
 
   bool get _reduceMotion => WidgetsBinding
@@ -86,34 +92,54 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: AppTheme.systemOverlayStyle,
+      value: AppTheme.overlayStyleFor(palette),
       child: Scaffold(
-        body: GradientBackground(
-          colors: AppColors.brandGradient,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedLogo(key: _logoKey, progress: _intro),
-                const SizedBox(height: 24),
-                _FadeSlideIn(
-                  animation: _wordmark,
-                  child: Text(
-                    AppStrings.appName.toUpperCase(),
-                    style: AppTextStyles.wordmark,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedBuilder(
+                animation: _discRise,
+                builder: (context, child) => Transform.scale(
+                  scale: 0.9 + 0.1 * _discRise.value,
+                  child: TactileSurface(
+                    circle: true,
+                    depth: _discRise.value,
+                    distance: 16,
+                    duration: Duration.zero,
+                    child: child,
                   ),
                 ),
-                const SizedBox(height: 8),
-                _FadeSlideIn(
-                  animation: _tagline,
-                  child: const Text(
-                    AppStrings.appTagline,
-                    style: AppTextStyles.body,
+                child: SizedBox.square(
+                  dimension: 220,
+                  child: Center(
+                    child: AnimatedLogo(
+                      key: _logoKey,
+                      progress: _logo,
+                      size: 160,
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 44),
+              _LetterByLetter(
+                text: AppStrings.appName.toUpperCase(),
+                progress: _intro,
+                style: AppTextStyles.wordmark,
+              ),
+              const SizedBox(height: 10),
+              FadeTransition(
+                opacity: _tagline,
+                child: Text(
+                  AppStrings.appTagline,
+                  style: AppTextStyles.body.copyWith(
+                    color: palette.textSecondary,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -121,11 +147,61 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-class _FadeSlideIn extends StatelessWidget {
-  const _FadeSlideIn({required this.animation, required this.child});
+/// Each letter floats up and fades in slightly after the previous one.
+class _LetterByLetter extends StatelessWidget {
+  const _LetterByLetter({
+    required this.text,
+    required this.progress,
+    required this.style,
+  });
 
+  final String text;
+  final Animation<double> progress;
+  final TextStyle style;
+
+  static const _start = 0.45;
+  static const _perLetter = 0.05;
+  static const _letterDuration = 0.3;
+
+  @override
+  Widget build(BuildContext context) {
+    final letters = text.characters.toList();
+    return Semantics(
+      label: text,
+      child: ExcludeSemantics(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < letters.length; i++)
+              _Letter(
+                letter: letters[i],
+                style: style,
+                animation: CurvedAnimation(
+                  parent: progress,
+                  curve: Interval(
+                    _start + i * _perLetter,
+                    (_start + i * _perLetter + _letterDuration).clamp(0, 1),
+                    curve: Curves.easeOutCubic,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Letter extends StatelessWidget {
+  const _Letter({
+    required this.letter,
+    required this.style,
+    required this.animation,
+  });
+
+  final String letter;
+  final TextStyle style;
   final Animation<double> animation;
-  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -133,10 +209,10 @@ class _FadeSlideIn extends StatelessWidget {
       opacity: animation,
       child: SlideTransition(
         position: Tween(
-          begin: const Offset(0, 0.4),
+          begin: const Offset(0, 0.5),
           end: Offset.zero,
         ).animate(animation),
-        child: child,
+        child: Text(letter, style: style),
       ),
     );
   }

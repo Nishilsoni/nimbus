@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:nimbus/core/constants/app_strings.dart';
 import 'package:nimbus/core/theme/app_text_styles.dart';
+import 'package:nimbus/core/theme/surface_palette.dart';
+import 'package:nimbus/core/widgets/motion/smooth_switcher.dart';
 import 'package:nimbus/core/widgets/relative_time_text.dart';
+import 'package:nimbus/core/widgets/tactile/tactile_button.dart';
+import 'package:nimbus/features/appearance/presentation/widgets/appearance_button.dart';
 import 'package:nimbus/features/weather/domain/entities/city.dart';
+import 'package:nimbus/features/weather/presentation/widgets/search_hero.dart';
 
 /// City name, freshness, and the screen's actions.
 class WeatherHeader extends StatelessWidget {
@@ -25,29 +30,59 @@ class WeatherHeader extends StatelessWidget {
   /// `null` hides the refresh button (nothing to refresh yet).
   final VoidCallback? onRefresh;
 
+  // Compact enough that four buttons leave room for the city name.
+  static const _buttonSize = 42.0;
+  static const _buttonGap = 12.0;
+
   @override
   Widget build(BuildContext context) {
     final onRefresh = this.onRefresh;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 8, 4),
+      padding: const EdgeInsets.fromLTRB(24, 12, 18, 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: _Title(city: city, fetchedAt: fetchedAt),
           ),
-          IconButton(
+          const SizedBox(width: 10),
+          const AppearanceButton(size: _buttonSize),
+          const SizedBox(width: _buttonGap),
+          TactileIconButton(
+            icon: Icons.my_location_rounded,
             tooltip: AppStrings.useMyLocation,
-            icon: const Icon(Icons.my_location_rounded),
             onPressed: onUseLocation,
+            size: _buttonSize,
           ),
-          IconButton(
-            tooltip: AppStrings.searchCity,
-            icon: const Icon(Icons.search_rounded),
-            onPressed: onSearch,
+          const SizedBox(width: _buttonGap),
+          SearchHero(
+            child: TactileIconButton(
+              icon: Icons.search_rounded,
+              tooltip: AppStrings.searchCity,
+              onPressed: onSearch,
+              size: _buttonSize,
+            ),
           ),
-          if (onRefresh != null)
-            _RefreshButton(isRefreshing: isRefreshing, onPressed: onRefresh),
+          // Slides in once there's something to refresh.
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            child: onRefresh == null
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.only(left: _buttonGap),
+                    child: TactileIconButton(
+                      icon: Icons.refresh_rounded,
+                      tooltip: isRefreshing
+                          ? AppStrings.refreshing
+                          : AppStrings.refresh,
+                      // Pressed in and spinning while busy; disabled so
+                      // repeated taps can't queue duplicate requests.
+                      isBusy: isRefreshing,
+                      onPressed: onRefresh,
+                      size: _buttonSize,
+                    ),
+                  ),
+          ),
         ],
       ),
     );
@@ -62,82 +97,60 @@ class _Title extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     final city = this.city;
     final fetchedAt = this.fetchedAt;
-    if (city == null) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 8),
-        child: Text(AppStrings.appName, style: AppTextStyles.headline),
-      );
-    }
-
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
-      layoutBuilder: (current, previous) => Stack(
-        alignment: Alignment.topLeft,
-        children: [...previous, ?current],
-      ),
-      child: Column(
-        key: ValueKey(city),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (city.isCurrentLocation) ...[
-                const Icon(Icons.near_me_rounded, size: 18),
-                const SizedBox(width: 6),
-              ],
-              Flexible(
-                child: Text(
-                  city.name,
-                  style: AppTextStyles.cityTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          if (city.subtitle.isNotEmpty)
-            Text(
-              city.subtitle,
-              style: AppTextStyles.caption,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          if (fetchedAt != null)
-            RelativeTimeText(
-              time: fetchedAt,
-              builder: AppStrings.updated,
-              style: AppTextStyles.caption,
-            ),
-        ],
-      ),
+    final secondary = AppTextStyles.caption.copyWith(
+      color: palette.textSecondary,
     );
-  }
-}
 
-class _RefreshButton extends StatelessWidget {
-  const _RefreshButton({required this.isRefreshing, required this.onPressed});
-
-  final bool isRefreshing;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: isRefreshing ? AppStrings.refreshing : AppStrings.refresh,
-      // Disabled while busy so repeated taps can't queue duplicate requests.
-      onPressed: isRefreshing ? null : onPressed,
-      icon: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
-        child: isRefreshing
-            ? const SizedBox.square(
-                key: ValueKey('spinner'),
-                dimension: 20,
-                child: CircularProgressIndicator(strokeWidth: 2.2),
-              )
-            : const Icon(Icons.refresh_rounded, key: ValueKey('icon')),
-      ),
+    return SmoothSwitcher(
+      alignment: Alignment.centerLeft,
+      child: city == null
+          ? const Align(
+              key: ValueKey('app-name'),
+              alignment: Alignment.centerLeft,
+              child: Text(AppStrings.appName, style: AppTextStyles.headline),
+            )
+          : Column(
+              key: ValueKey(city),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (city.isCurrentLocation) ...[
+                      Icon(
+                        Icons.near_me_rounded,
+                        size: 18,
+                        color: palette.accent,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Flexible(
+                      child: Text(
+                        city.name,
+                        style: AppTextStyles.cityTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                if (city.subtitle.isNotEmpty)
+                  Text(
+                    city.subtitle,
+                    style: secondary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                if (fetchedAt != null)
+                  RelativeTimeText(
+                    time: fetchedAt,
+                    builder: AppStrings.updated,
+                    style: secondary.copyWith(color: palette.textMuted),
+                  ),
+              ],
+            ),
     );
   }
 }

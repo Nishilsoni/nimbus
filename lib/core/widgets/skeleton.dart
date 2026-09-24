@@ -1,29 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:nimbus/core/widgets/tactile/tactile_surface.dart';
 
-import 'package:nimbus/core/theme/app_colors.dart';
-
-/// A placeholder block shown while content loads.
+/// A placeholder carved into the surface while content loads.
 class SkeletonBox extends StatelessWidget {
   const SkeletonBox({
     super.key,
     this.width,
     required this.height,
-    this.radius = 12,
+    this.radius = 14,
+    this.circle = false,
   });
 
   /// `null` fills the available width.
   final double? width;
   final double height;
   final double radius;
+  final bool circle;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: width,
       height: height,
-      decoration: BoxDecoration(
-        color: AppColors.skeleton,
-        borderRadius: BorderRadius.circular(radius),
+      child: TactileSurface(
+        depth: -0.7,
+        radius: radius,
+        circle: circle,
+        distance: 4,
       ),
     );
   }
@@ -44,9 +47,14 @@ class _SkeletonPulseState extends State<SkeletonPulse>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 900),
-    lowerBound: 0.45,
+    duration: const Duration(milliseconds: 1100),
+    lowerBound: 0.5,
     value: 1,
+  );
+
+  late final Animation<double> _opacity = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeInOut,
   );
 
   @override
@@ -67,6 +75,6 @@ class _SkeletonPulseState extends State<SkeletonPulse>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(opacity: _controller, child: widget.child);
+    return FadeTransition(opacity: _opacity, child: widget.child);
   }
 }

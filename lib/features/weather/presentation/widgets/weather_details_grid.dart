@@ -2,16 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:nimbus/core/constants/app_strings.dart';
 import 'package:nimbus/core/utils/date_formatter.dart';
 import 'package:nimbus/core/utils/unit_formatter.dart';
+import 'package:nimbus/core/widgets/motion/staggered_entrance.dart';
 import 'package:nimbus/features/weather/domain/entities/weather.dart';
 import 'package:nimbus/features/weather/presentation/widgets/detail_tile.dart';
 
 /// All secondary measurements as a two-column grid of [DetailTile]s.
 class WeatherDetailsGrid extends StatelessWidget {
-  const WeatherDetailsGrid({super.key, required this.weather});
+  const WeatherDetailsGrid({
+    super.key,
+    required this.weather,
+    this.firstEntranceIndex = 0,
+  });
 
   final Weather weather;
 
-  static const _spacing = 12.0;
+  /// Where the rows join the screen's entrance cascade.
+  final int firstEntranceIndex;
+
+  /// Soft shadows need room to breathe between cards.
+  static const _spacing = 18.0;
 
   List<DetailTile> _tiles() {
     final sunrise = weather.sunrise;
@@ -75,20 +84,23 @@ class WeatherDetailsGrid extends StatelessWidget {
             padding: EdgeInsets.only(
               bottom: i + 2 < tiles.length ? _spacing : 0,
             ),
-            // Keeps both tiles in a row the same height, even when only one
-            // has a caption.
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: tiles[i]),
-                  const SizedBox(width: _spacing),
-                  Expanded(
-                    child: i + 1 < tiles.length
-                        ? tiles[i + 1]
-                        : const SizedBox.shrink(),
-                  ),
-                ],
+            child: StaggeredEntrance(
+              index: firstEntranceIndex + i ~/ 2,
+              // Keeps both tiles in a row the same height, even when only
+              // one has a caption.
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: tiles[i]),
+                    const SizedBox(width: _spacing),
+                    Expanded(
+                      child: i + 1 < tiles.length
+                          ? tiles[i + 1]
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

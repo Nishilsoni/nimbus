@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the dark NeuPalette base, used when the device is in dark
+         mode (the app follows the system theme until weather loads). -->
+    <color name="splash_background">#2A313F</color>
+</resources>

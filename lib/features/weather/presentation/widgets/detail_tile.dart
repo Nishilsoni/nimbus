@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:nimbus/core/theme/app_colors.dart';
 import 'package:nimbus/core/theme/app_text_styles.dart';
-import 'package:nimbus/core/widgets/glass_card.dart';
+import 'package:nimbus/core/theme/surface_palette.dart';
+import 'package:nimbus/core/widgets/motion/smooth_switcher.dart';
+import 'package:nimbus/core/widgets/tactile/tactile_surface.dart';
 
-/// One measurement, e.g. "HUMIDITY · 60%".
+/// One measurement, e.g. "HUMIDITY · 60%", on a raised card. The value
+/// cross-fades when a refresh changes it.
 class DetailTile extends StatelessWidget {
   const DetailTile({
     super.key,
@@ -22,29 +24,55 @@ class DetailTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     final caption = this.caption;
+
     return MergeSemantics(
-      child: GlassCard(
+      child: TactileSurface(
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(icon, size: 16, color: AppColors.textMuted),
-                const SizedBox(width: 6),
+                TactileSurface(
+                  circle: true,
+                  depth: -1,
+                  distance: 3,
+                  child: SizedBox.square(
+                    dimension: 32,
+                    child: Icon(icon, size: 16, color: palette.accent),
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     label.toUpperCase(),
-                    style: AppTextStyles.tileLabel,
+                    style: AppTextStyles.tileLabel.copyWith(
+                      color: palette.textMuted,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text(value, style: AppTextStyles.tileValue),
-            if (caption != null) Text(caption, style: AppTextStyles.caption),
+            const SizedBox(height: 14),
+            SmoothSwitcher(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                key: ValueKey(value),
+                style: AppTextStyles.tileValue,
+              ),
+            ),
+            if (caption != null)
+              Text(
+                caption,
+                style: AppTextStyles.caption.copyWith(
+                  color: palette.textSecondary,
+                ),
+              ),
           ],
         ),
       ),

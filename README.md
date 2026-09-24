@@ -6,9 +6,13 @@ A Flutter weather app that shows current conditions for any city or for your GPS
 |:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/01_splash.png" width="200"> | <img src="docs/screenshots/02_welcome.png" width="200"> | <img src="docs/screenshots/03_city_not_found.png" width="200"> | <img src="docs/screenshots/04_search_results.png" width="200"> |
 
-| Weather | Refresh failed (offline) | GPS location | Opened offline (cache) |
+| Weather | Refresh failed (offline) | Details | GPS location |
 |:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/05_weather.png" width="200"> | <img src="docs/screenshots/06_refresh_failed.png" width="200"> | <img src="docs/screenshots/08_current_location.png" width="200"> | <img src="docs/screenshots/09_offline_cached.png" width="200"> |
+| <img src="docs/screenshots/05_weather.png" width="200"> | <img src="docs/screenshots/06_refresh_failed.png" width="200"> | <img src="docs/screenshots/07_details.png" width="200"> | <img src="docs/screenshots/08_current_location.png" width="200"> |
+
+| Dark theme | Opened offline (cache) |
+|:---:|:---:|
+| <img src="docs/screenshots/09_dark_mode.png" width="200"> | <img src="docs/screenshots/10_offline_cached.png" width="200"> |
 
 All screenshots are real captures from the iOS simulator against the live API. The [end-to-end test](integration_test/app_walkthrough_test.dart) produced them.
 
@@ -41,6 +45,7 @@ All screenshots are real captures from the iOS simulator against the live API. T
 - [x] **Manual refresh.** Pull-to-refresh and a refresh button. Both work in every state, including the error view.
 - [x] **State handling.** Separate views for first load (skeleton), success, empty and error, plus visible refreshing and refresh-failed states.
 - [x] **Location input.** Search-as-you-type, with a debounce and country flags.
+- [x] **Light and dark themes.** Automatic (light by day, dark by night at the city on screen), or fixed to light or dark from the header. The choice is remembered.
 
 **Requirements**
 - [x] Free API, [Open-Meteo](https://open-meteo.com). It needs **no API key**.
@@ -51,7 +56,7 @@ All screenshots are real captures from the iOS simulator against the live API. T
 **Bonus**
 - [x] Local cache of the last successful response. The app opens straight onto it, even offline.
 - [x] Device GPS "current location" weather, with full permission handling.
-- [x] This README, screenshots, and a test suite of 100 unit and widget tests plus 2 end-to-end tests.
+- [x] This README, screenshots, and a test suite of 108 unit and widget tests plus 2 end-to-end tests.
 
 ---
 
@@ -70,7 +75,7 @@ No API keys, `.env` files or code generation are needed.
 **Tests**
 
 ```bash
-flutter test                                   # 100 unit and widget tests, no device needed
+flutter test                                   # 108 unit and widget tests, no device needed
 flutter test integration_test -d <device-id>   # end-to-end on a device or simulator
 ```
 
@@ -125,10 +130,14 @@ lib/
 │   ├── error/                    AppException (data layer) and sealed Failure (domain)
 │   ├── network/                  ApiClient (timeout, status → exception); NetworkInfo
 │   ├── navigation/               CircularRevealRoute page transition
-│   ├── theme/                    Colours, text styles, ThemeData
+│   ├── theme/                    SurfacePalette (light and dark), text styles, ThemeData
 │   ├── utils/                    Result type, JSON reader, date/unit formatters, flags
-│   └── widgets/                  GlassCard, StatusMessage, skeletons, SkyShapes painters…
+│   └── widgets/
+│       ├── tactile/              Surface, pressable, buttons, text field, progress bar
+│       ├── motion/               Staggered entrance, counting number, smooth switcher, spinner
+│       └── …                     StatusMessage, skeletons, SkyShapes painters
 └── features/
+    ├── appearance/               Automatic / light / dark setting (domain, data, cubit, toggle)
     ├── splash/presentation/      Splash screen and animated logo
     └── weather/
         ├── domain/
@@ -142,14 +151,15 @@ lib/
         └── presentation/
             ├── cubit/            WeatherCubit, CitySearchCubit and their states
             ├── screens/          WeatherScreen, CitySearchScreen
-            ├── utils/            How each Failure and condition is shown (icon, copy, sky)
-            └── widgets/          Header, hero conditions, detail grid, banner, views…
+            ├── utils/            How each Failure and condition is shown (icon, copy, accent)
+            └── widgets/          Header, hero dial, detail grid, banner, views, search morph…
 ```
 
 A few placement decisions worth calling out:
 - **`SkyShapes` lives in `core/widgets`** because the splash logo and the weather illustrations both draw with it. Keeping it in the weather feature would make splash depend on weather.
 - **The WMO code → condition mapping lives in the data layer.** Codes are a detail of the provider. The domain only knows `WeatherCondition`.
 - **Failure icons and copy live in `presentation/utils/failure_display.dart`**, not on the `Failure` classes, so the domain stays free of Flutter.
+- **Appearance is its own small feature** with the same layers. The weather header shows its toggle, and the app root combines the setting with the weather to pick the theme.
 
 ---
 
@@ -263,11 +273,22 @@ Platform setup is already done: `ACCESS_COARSE_LOCATION` and `ACCESS_FINE_LOCATI
 
 ## UI and motion
 
+**Design**
+- **Soft, tactile surfaces.** Every card, button and field is moulded from the same base colour as the background, separated only by light: a highlight towards the top-left and a soft shadow towards the bottom-right. Wells, such as the search field and icon holders, are carved into the surface. All of it is drawn by one small painter, [`TactileSurface`](lib/core/widgets/tactile/tactile_surface.dart), whose `depth` runs from raised (1) through flat (0) to pressed in (−1).
+- **Light and dark palettes.** [`SurfacePalette`](lib/core/theme/surface_palette.dart) derives the highlight and shadow from the base colour. The weather tints the surface faintly: warm for sun, blue for rain, violet for storms. The palette is a `ThemeExtension`, so changing it (a new city, sunset, or the theme toggle) animates every surface, shadow and text colour over 0.9 s.
+- **Theme toggle** in the header: automatic → light → dark. Automatic follows day and night at the city on screen, and the device's setting before any weather has loaded.
 - **Every illustration is painted in code** (`CustomPainter`): a turning sun, a crescent moon with twinkling stars, drifting clouds, and falling rain, snow, lightning and fog. There are no image assets or icon packs, and the drawing is sharp at any size. Each animation completes a whole number of cycles per loop, so it never jumps when the loop restarts.
-- The **background gradient** follows the condition and whether it's day or night, and animates between skies.
-- **Splash:** the sun rises and the cloud drifts in, the wordmark fades up, then a **circular reveal** grows from the sun's centre into the weather screen. The native launch screen uses the same navy on Android (including the Android 12+ splash API) and iOS, so there's no white flash before Flutter draws.
-- **Reduced motion:** when the OS "reduce motion" setting is on, the illustrations and skeleton hold still and the splash is shorter.
-- **Accessibility:** tooltips on every icon button, a merged semantics label for the hero temperature and condition, and a live region on the refresh banner.
+
+**Motion**
+- **Physical presses.** Buttons and tiles sink into the surface when pressed, shrink slightly, and give a light haptic tick. The refresh button stays pressed in, with its icon spinning, while a refresh runs.
+- **Staggered entrances.** When a city appears, the dial, temperature, condition and detail rows float in one after another. Search results cascade in the same way.
+- **Values move instead of jumping.** The temperature counts to its new value, detail values cross-fade on refresh, and the illustration cross-fades when the condition changes.
+- **The search button morphs into the search field** (a shared-element transition) and back again.
+- **Splash:** a disc rises out of the surface, the sun and cloud settle into it, and the name appears letter by letter. Then a **circular reveal** grows from the sun into the weather screen. The native launch screen uses the same light or dark base colour on Android (including the Android 12+ splash API) and iOS, so there's no flash of a different colour before Flutter draws.
+- **Smooth everywhere else:** a soft bounce on scrolling, the failure banner sliding open and closed, and screens cross-fading between loading, error and content.
+- **Reduced motion:** when the OS "reduce motion" setting is on, entrances, counters, spinners, illustrations and skeletons hold still, and the splash is shorter.
+
+**Accessibility:** tooltips on every icon button, merged semantics for the hero block and each detail tile, a live region on the refresh banner, and text colours chosen for contrast on both palettes.
 
 ---
 
@@ -277,6 +298,7 @@ Platform setup is already done: `ACCESS_COARSE_LOCATION` and `ACCESS_FINE_LOCATI
 test/
 ├── core/network/api_client_test.dart          offline, socket, timeout, 429, 4xx/5xx, bad JSON, UTF-8
 ├── core/utils/formatters_test.dart            relative time, units, UV levels, flags
+├── features/appearance/appearance_test.dart   saved mode, toggle cycle, theme resolution
 └── features/weather/
     ├── data/…/wmo_code_mapper_test.dart       every WMO code group
     ├── data/…/models_test.dart                real API fixtures, cache round trips, missing fields
@@ -286,7 +308,7 @@ test/
     ├── presentation/cubit/weather_cubit_test  the refresh rules, cache-first launch, GPS
     ├── presentation/cubit/city_search_cubit…  debounce, not found, stale results
     └── presentation/screens/weather_screen…   each state renders; buttons call the cubit
-integration_test/app_walkthrough_test.dart     live API end to end (also takes the screenshots)
+integration_test/app_walkthrough_test.dart     live API end to end, in light and dark (also takes the screenshots)
 ```
 
 The fixtures in `test/fixtures/` are real Open-Meteo responses captured during development.
@@ -303,7 +325,7 @@ The list is deliberately short. Each package does one job that would be unreason
 | `equatable` | Value equality for states and entities |
 | `http` | HTTP client. Error mapping, timeouts and decoding are hand-written in `ApiClient` |
 | `connectivity_plus` | Fast offline pre-check |
-| `shared_preferences` | Stores the last report |
+| `shared_preferences` | Stores the last report and the theme choice |
 | `geolocator` | GPS position and permissions |
 | `geocoding` | Coordinates → place name (Open-Meteo has no reverse geocoding) |
 | `intl` | Time and date formatting |

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:nimbus/core/theme/app_colors.dart';
 import 'package:nimbus/core/theme/app_text_styles.dart';
+import 'package:nimbus/core/theme/surface_palette.dart';
 import 'package:nimbus/core/utils/country_flag.dart';
-import 'package:nimbus/core/widgets/glass_card.dart';
+import 'package:nimbus/core/widgets/tactile/tactile_pressable.dart';
+import 'package:nimbus/core/widgets/tactile/tactile_surface.dart';
 import 'package:nimbus/features/weather/domain/entities/city.dart';
 
-/// A tappable row in the search results, or the "current location" entry.
+/// A pressable row in the search results, or the "current location" entry.
 class CityResultTile extends StatelessWidget {
   const CityResultTile({
     super.key,
@@ -27,28 +28,42 @@ class CityResultTile extends StatelessWidget {
       title: city.name,
       subtitle: city.subtitle.isEmpty ? null : city.subtitle,
       leading: flag == null
-          ? const Icon(Icons.location_city_rounded)
-          : Text(flag, style: const TextStyle(fontSize: 26)),
+          ? null
+          : Text(flag, style: const TextStyle(fontSize: 22)),
       onTap: onTap,
     );
   }
 
   final String title;
   final String? subtitle;
+
+  /// Defaults to a city icon.
   final Widget? leading;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     final subtitle = this.subtitle;
-    return GlassCard(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+
+    return TactilePressable(
+      onPressed: onTap,
+      radius: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          SizedBox(
-            width: 36,
-            child: Center(child: leading ?? const Icon(Icons.place_rounded)),
+          TactileSurface(
+            circle: true,
+            depth: -1,
+            distance: 4,
+            child: SizedBox.square(
+              dimension: 42,
+              child: Center(
+                child:
+                    leading ??
+                    Icon(Icons.location_city_rounded, color: palette.accent),
+              ),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -59,14 +74,16 @@ class CityResultTile extends StatelessWidget {
                 if (subtitle != null)
                   Text(
                     subtitle,
-                    style: AppTextStyles.caption,
+                    style: AppTextStyles.caption.copyWith(
+                      color: palette.textSecondary,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+          Icon(Icons.chevron_right_rounded, color: palette.textMuted),
         ],
       ),
     );

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:nimbus/core/constants/app_strings.dart';
+import 'package:nimbus/core/theme/app_colors.dart';
 import 'package:nimbus/features/weather/domain/entities/weather_condition.dart';
 
-/// Labels and sky palettes for each [WeatherCondition].
+/// Labels and accent colours for each [WeatherCondition].
 extension ConditionVisuals on WeatherCondition {
   String get label => switch (this) {
     WeatherCondition.clear => AppStrings.conditionClear,
@@ -16,49 +17,38 @@ extension ConditionVisuals on WeatherCondition {
     WeatherCondition.unknown => AppStrings.conditionUnknown,
   };
 
-  /// Top-to-bottom background gradient for this sky.
-  List<Color> skyGradient({required bool isDay}) {
-    final palette = switch (this) {
-      WeatherCondition.clear ||
-      WeatherCondition.partlyCloudy => _SkyPalette.clear,
-      WeatherCondition.cloudy || WeatherCondition.unknown => _SkyPalette.cloudy,
-      WeatherCondition.fog => _SkyPalette.fog,
-      WeatherCondition.drizzle || WeatherCondition.rain => _SkyPalette.rain,
-      WeatherCondition.snow => _SkyPalette.snow,
-      WeatherCondition.thunderstorm => _SkyPalette.storm,
+  /// The accent that sets the screen's mood: warm for sun, blue for rain,
+  /// violet for storms. It also faintly tints the whole surface.
+  ///
+  /// Light variants are deep enough for white text on an accent button;
+  /// dark variants are bright enough to read on the night surface.
+  Color accent({required bool isDark}) {
+    final mood = switch (this) {
+      WeatherCondition.clear || WeatherCondition.partlyCloudy => _Mood.sunny,
+      WeatherCondition.cloudy || WeatherCondition.unknown => _Mood.overcast,
+      WeatherCondition.fog => _Mood.misty,
+      WeatherCondition.drizzle || WeatherCondition.rain => _Mood.rainy,
+      WeatherCondition.snow => _Mood.snowy,
+      WeatherCondition.thunderstorm => _Mood.stormy,
     };
-    return isDay ? palette.day : palette.night;
+    return isDark ? mood.dark : mood.light;
   }
 }
 
-enum _SkyPalette {
-  clear(
-    day: [Color(0xFF1F6FEB), Color(0xFF4A9BFF), Color(0xFF86C3FF)],
-    night: [Color(0xFF0A1330), Color(0xFF1A2A5C), Color(0xFF2E3F7A)],
-  ),
-  cloudy(
-    day: [Color(0xFF46648C), Color(0xFF6F89AD), Color(0xFF97ACC7)],
-    night: [Color(0xFF161E2E), Color(0xFF283349), Color(0xFF3A4760)],
-  ),
-  fog(
-    day: [Color(0xFF5D6E80), Color(0xFF7D8D9D), Color(0xFF9DAAB7)],
-    night: [Color(0xFF1F262E), Color(0xFF323B45), Color(0xFF454F5A)],
-  ),
-  rain(
-    day: [Color(0xFF2F435B), Color(0xFF4A627F), Color(0xFF6A819E)],
-    night: [Color(0xFF101826), Color(0xFF1D293B), Color(0xFF2B3950)],
-  ),
-  snow(
-    day: [Color(0xFF4F7299), Color(0xFF7090B4), Color(0xFF95AFCC)],
-    night: [Color(0xFF1A273C), Color(0xFF2C3F5C), Color(0xFF41577A)],
-  ),
-  storm(
-    day: [Color(0xFF231F35), Color(0xFF3A3456), Color(0xFF524A70)],
-    night: [Color(0xFF120F1E), Color(0xFF231E36), Color(0xFF362F50)],
-  );
+/// Accent to use before any weather has loaded.
+Color brandAccent({required bool isDark}) =>
+    isDark ? AppColors.brandDark : AppColors.brandLight;
 
-  const _SkyPalette({required this.day, required this.night});
+enum _Mood {
+  sunny(light: Color(0xFFC8620C), dark: Color(0xFFFFB35C)),
+  overcast(light: Color(0xFF56688A), dark: Color(0xFFA9B9D3)),
+  misty(light: Color(0xFF5E6B7D), dark: Color(0xFFB4BECC)),
+  rainy(light: Color(0xFF2A72C9), dark: Color(0xFF6DB3FF)),
+  snowy(light: Color(0xFF2380B5), dark: Color(0xFF7FD3FF)),
+  stormy(light: Color(0xFF6247D6), dark: Color(0xFFA792FF));
 
-  final List<Color> day;
-  final List<Color> night;
+  const _Mood({required this.light, required this.dark});
+
+  final Color light;
+  final Color dark;
 }
