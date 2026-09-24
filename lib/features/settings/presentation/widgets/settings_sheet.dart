@@ -60,7 +60,7 @@ class SettingsSheet extends StatelessWidget {
 
         return AnimatedTheme(
           data: AppTheme.fromPalette(palette),
-          duration: const Duration(milliseconds: 280),
+          duration: const Duration(milliseconds: 180),
           curve: Curves.easeInOutCubic,
           child: Material(
             color: palette.base,

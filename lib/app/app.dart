@@ -90,7 +90,7 @@ class _ThemedApp extends StatelessWidget {
         SurfacePalette.dark(accent: accent(isDark: true)),
       ),
       themeMode: settings.appearance.toThemeMode(isDay: look.isDay),
-      themeAnimationDuration: const Duration(milliseconds: 900),
+      themeAnimationDuration: const Duration(milliseconds: 180),
       themeAnimationCurve: Curves.easeInOutCubic,
       builder: (context, child) =>
           UnitScope(unit: settings.temperatureUnit, child: child!),
