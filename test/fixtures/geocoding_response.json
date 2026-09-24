@@ -1,0 +1,31 @@
+{
+  "results": [
+    {
+      "id": 1279233,
+      "name": "Ahmedabad",
+      "latitude": 23.02579,
+      "longitude": 72.58727,
+      "elevation": 56.0,
+      "feature_code": "PPL",
+      "country_code": "IN",
+      "timezone": "Asia/Kolkata",
+      "population": 6357693,
+      "country": "India",
+      "admin1": "Gujarat",
+      "admin2": "Ahmadābād District"
+    },
+    {
+      "id": 1181019,
+      "name": "Ahmedabad",
+      "latitude": 34.22118,
+      "longitude": 73.0139,
+      "elevation": 779.0,
+      "feature_code": "PPL",
+      "country_code": "PK",
+      "timezone": "Asia/Karachi",
+      "country": "Pakistan",
+      "admin1": "Khyber Pakhtunkhwa"
+    }
+  ],
+  "generationtime_ms": 0.42259693
+}

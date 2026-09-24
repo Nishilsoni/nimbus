@@ -1,0 +1,40 @@
+name: nimbus
+description: "Nimbus - a clean-architecture Flutter weather app."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management (Cubit).
+  flutter_bloc: ^9.1.1
+  # Value equality for states and entities.
+  equatable: ^3.0.0
+  # HTTP client; error mapping is hand-written in ApiClient.
+  http: ^1.6.0
+  # Fast "are we offline?" check before a request.
+  connectivity_plus: ^7.3.1
+  # Stores the last successful weather report.
+  shared_preferences: ^2.5.5
+  # Device GPS position and permissions.
+  geolocator: ^14.0.3
+  # Turns GPS coordinates into a place name.
+  geocoding: ^5.0.0
+  # Date and time formatting.
+  intl: ^0.20.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  bloc_test: ^10.0.0
+  mocktail: ^1.0.5
+
+flutter:
+  uses-material-design: true
