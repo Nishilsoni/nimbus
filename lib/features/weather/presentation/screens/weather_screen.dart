@@ -3,220 +3,258 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:nimbus/core/layout/breakpoints.dart';
 import 'package:nimbus/core/theme/app_theme.dart';
 import 'package:nimbus/core/theme/surface_palette.dart';
-import 'package:nimbus/core/widgets/motion/smooth_switcher.dart';
-import 'package:nimbus/core/widgets/tactile/tactile_progress_bar.dart';
+import 'package:nimbus/features/weather/domain/entities/place.dart';
+import 'package:nimbus/features/weather/domain/entities/saved_places.dart';
+import 'package:nimbus/features/weather/domain/repositories/location_repository.dart';
+import 'package:nimbus/features/weather/domain/repositories/weather_repository.dart';
+import 'package:nimbus/features/weather/presentation/cubit/places_cubit.dart';
 import 'package:nimbus/features/weather/presentation/cubit/weather_cubit.dart';
+import 'package:nimbus/features/weather/presentation/cubit/weather_look_cubit.dart';
 import 'package:nimbus/features/weather/presentation/cubit/weather_state.dart';
-import 'package:nimbus/features/weather/presentation/screens/city_search_screen.dart';
-import 'package:nimbus/features/weather/presentation/utils/failure_display.dart';
+import 'package:nimbus/features/weather/presentation/screens/weather_page.dart';
 import 'package:nimbus/features/weather/presentation/widgets/empty_view.dart';
-import 'package:nimbus/features/weather/presentation/widgets/error_view.dart';
-import 'package:nimbus/features/weather/presentation/widgets/loading_view.dart';
-import 'package:nimbus/features/weather/presentation/widgets/refresh_status_banner.dart';
-import 'package:nimbus/features/weather/presentation/widgets/weather_content.dart';
+import 'package:nimbus/features/weather/presentation/widgets/page_dots.dart';
 import 'package:nimbus/features/weather/presentation/widgets/weather_header.dart';
 
-/// The main screen. It maps [WeatherState] to widgets and user actions to
-/// [WeatherCubit] calls; it holds no logic of its own.
-class WeatherScreen extends StatelessWidget {
+/// The user's places as pages to swipe between, or a welcome view when
+/// none are saved yet.
+class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final cubit = context.read<WeatherCubit>();
+  State<WeatherScreen> createState() => _WeatherScreenState();
+}
 
+class _WeatherScreenState extends State<WeatherScreen> {
+  late final PageController _pages;
+
+  /// What the pager last followed, to tell additions from removals.
+  late SavedPlaces _lastPlaces;
+
+  /// Room kept below each page's content for the page dots.
+  static const _dotsSpace = 64.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastPlaces = context.read<PlacesCubit>().state;
+    _pages = PageController(initialPage: _lastPlaces.selectedIndex);
+  }
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  /// Keeps the pager in step with [PlacesCubit] when a place is added,
+  /// removed or chosen from the search screen. Runs after the frame, once
+  /// the pager knows about any new page.
+  void _followSelection(SavedPlaces previous, SavedPlaces current) {
+    if (current.isEmpty) {
+      context.read<WeatherLookCubit>().show(null);
+      return;
+    }
+    final wasRemoval = previous.places.length > current.places.length;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_pages.hasClients) return;
+      final target = current.selectedIndex;
+      if (_pages.page?.round() == target) return;
+      if (wasRemoval) {
+        // After a removal, sliding past other pages would be confusing.
+        _pages.jumpToPage(target);
+      } else {
+        unawaited(
+          _pages.animateToPage(
+            target,
+            duration: const Duration(milliseconds: 520),
+            curve: Curves.easeInOutCubic,
+          ),
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppTheme.overlayStyleFor(context.palette),
       child: Scaffold(
-        body: BlocBuilder<WeatherCubit, WeatherState>(
-          builder: (context, state) {
-            final report = state.report;
-            return SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  WeatherHeader(
-                    city: report?.city,
-                    fetchedAt: report?.fetchedAt,
-                    isRefreshing: state.isBusy,
-                    onSearch: () => _openSearch(context),
-                    onUseLocation: cubit.useCurrentLocation,
-                    onRefresh: state.status == WeatherStatus.initial
-                        ? null
-                        : cubit.refresh,
+        body: BlocConsumer<PlacesCubit, SavedPlaces>(
+          listenWhen: (before, after) =>
+              before.selectedIndex != after.selectedIndex ||
+              before.places.length != after.places.length,
+          listener: (context, places) {
+            _followSelection(_lastPlaces, places);
+            _lastPlaces = places;
+          },
+          builder: (context, saved) {
+            if (saved.isEmpty) return const _NoPlaces();
+
+            final places = saved.places;
+            final showsDots = places.length > 1;
+            return Stack(
+              children: [
+                PageView.builder(
+                  controller: _pages,
+                  itemCount: places.length,
+                  onPageChanged: context.read<PlacesCubit>().select,
+                  // Lets pages keep their state when a place is inserted
+                  // before them (the location page is always first).
+                  findChildIndexCallback: (key) {
+                    final index = places.indexWhere(
+                      (place) => ValueKey(place.id) == key,
+                    );
+                    return index == -1 ? null : index;
+                  },
+                  itemBuilder: (context, index) => _PlacePage(
+                    key: ValueKey(places[index].id),
+                    place: places[index],
+                    isShowing: index == saved.selectedIndex,
+                    bottomInset: showsDots ? _dotsSpace : 0,
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 6, 24, 0),
-                    child: TactileProgressBar(isVisible: state.isRefreshing),
-                  ),
-                  Expanded(
-                    child: RefreshIndicator(
-                      onRefresh: cubit.refresh,
-                      // Nothing to refresh before a city has been chosen.
-                      notificationPredicate: (notification) =>
-                          state.status != WeatherStatus.initial &&
-                          defaultScrollNotificationPredicate(notification),
-                      child: _AlwaysScrollable(
-                        resetKey: report?.city,
-                        builder: (viewportHeight) =>
-                            _buildBody(context, state, viewportHeight),
+                ),
+                if (showsDots)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: MediaQuery.paddingOf(context).bottom + 14,
+                    child: Center(
+                      child: PageDots(
+                        count: places.length,
+                        index: saved.selectedIndex,
+                        firstIsLocation: saved.includesCurrentLocation,
                       ),
                     ),
                   ),
-                ],
-              ),
+              ],
             );
           },
         ),
       ),
     );
   }
-
-  Widget _buildBody(
-    BuildContext context,
-    WeatherState state,
-    double viewportHeight,
-  ) {
-    final cubit = context.read<WeatherCubit>();
-    final report = state.report;
-    final failure = state.failure;
-
-    final Widget body;
-    if (report != null) {
-      body = Column(
-        key: ValueKey(report.city),
-        children: [
-          AnimatedSize(
-            duration: const Duration(milliseconds: 320),
-            curve: Curves.easeOutCubic,
-            child: SmoothSwitcher(
-              alignment: Alignment.topCenter,
-              child: failure == null
-                  ? const SizedBox(
-                      key: ValueKey('no-banner'),
-                      width: double.infinity,
-                    )
-                  : Padding(
-                      key: ValueKey(failure),
-                      padding: const EdgeInsets.only(top: 8, bottom: 12),
-                      child: RefreshStatusBanner(
-                        failure: failure,
-                        lastUpdated: report.fetchedAt,
-                        onAction: () => _handleFailureAction(context, state),
-                        onDismiss: cubit.dismissFailure,
-                      ),
-                    ),
-            ),
-          ),
-          WeatherContent(report: report),
-        ],
-      );
-    } else if (state.status == WeatherStatus.loading) {
-      body = const LoadingView(key: ValueKey('loading'));
-    } else {
-      body = SizedBox(
-        key: ValueKey(failure ?? 'empty'),
-        height: viewportHeight,
-        child: Center(
-          child: failure == null
-              ? EmptyView(
-                  onSearch: () => _openSearch(context),
-                  onUseLocation: cubit.useCurrentLocation,
-                )
-              : ErrorView(
-                  failure: failure,
-                  onAction: () => _handleFailureAction(context, state),
-                  onSearch: () => _openSearch(context),
-                ),
-        ),
-      );
-    }
-
-    return SmoothSwitcher(
-      duration: const Duration(milliseconds: 450),
-      alignment: Alignment.topCenter,
-      child: body,
-    );
-  }
-
-  void _handleFailureAction(BuildContext context, WeatherState state) {
-    final cubit = context.read<WeatherCubit>();
-    switch (state.failure?.action) {
-      case FailureAction.openSettings:
-        unawaited(cubit.openLocationSettings());
-      case FailureAction.retryLocation:
-        unawaited(cubit.useCurrentLocation());
-      case FailureAction.retry || null:
-        unawaited(cubit.refresh());
-    }
-  }
-
-  void _openSearch(BuildContext context) {
-    unawaited(Navigator.of(context).push(CitySearchScreen.route()));
-  }
 }
 
-/// Makes its content scrollable even when it's shorter than the screen, so
-/// pull-to-refresh works in every state, including the error view.
-class _AlwaysScrollable extends StatefulWidget {
-  const _AlwaysScrollable({required this.builder, required this.resetKey});
+/// Owns one place's [WeatherCubit] and keeps it alive while the user
+/// swipes elsewhere, so coming back doesn't refetch. While it's the page on
+/// screen, it tells the app which weather to theme itself after.
+class _PlacePage extends StatefulWidget {
+  const _PlacePage({
+    super.key,
+    required this.place,
+    required this.isShowing,
+    required this.bottomInset,
+  });
 
-  /// Receives the height available for content, for centring short views.
-  final Widget Function(double viewportHeight) builder;
-
-  /// When this changes (e.g. a different city loads), scroll back to the
-  /// top so the new weather is seen from its headline.
-  final Object? resetKey;
+  final Place place;
+  final bool isShowing;
+  final double bottomInset;
 
   @override
-  State<_AlwaysScrollable> createState() => _AlwaysScrollableState();
+  State<_PlacePage> createState() => _PlacePageState();
 }
 
-class _AlwaysScrollableState extends State<_AlwaysScrollable> {
-  /// Generous side padding: the soft shadows need room to fall.
-  static const _padding = EdgeInsets.fromLTRB(24, 12, 24, 40);
-
-  final _controller = ScrollController();
+class _PlacePageState extends State<_PlacePage>
+    with AutomaticKeepAliveClientMixin {
+  late final WeatherCubit _cubit = WeatherCubit(
+    place: widget.place,
+    weatherRepository: context.read<WeatherRepository>(),
+    locationRepository: context.read<LocationRepository>(),
+  );
 
   @override
-  void didUpdateWidget(_AlwaysScrollable oldWidget) {
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_cubit.refresh());
+    _reportLookAfterFrame();
+  }
+
+  @override
+  void didUpdateWidget(_PlacePage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.resetKey != widget.resetKey && _controller.hasClients) {
-      unawaited(
-        _controller.animateTo(
-          0,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeOutCubic,
-        ),
-      );
-    }
+    if (widget.isShowing && !oldWidget.isShowing) _reportLookAfterFrame();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    unawaited(_cubit.close());
     super.dispose();
   }
 
+  /// The theme can't change while widgets are building, so wait a frame.
+  void _reportLookAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.isShowing) _reportLook();
+    });
+  }
+
+  void _reportLook() =>
+      context.read<WeatherLookCubit>().show(_cubit.state.report?.weather);
+
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final viewportHeight =
-            constraints.maxHeight - _padding.vertical - bottomInset;
-        return SingleChildScrollView(
-          controller: _controller,
-          // A soft bounce on every platform suits the tactile design.
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
+    super.build(context);
+    return BlocProvider.value(
+      value: _cubit,
+      child: BlocListener<WeatherCubit, WeatherState>(
+        listenWhen: (before, after) =>
+            before.report?.weather != after.report?.weather,
+        listener: (_, _) {
+          if (widget.isShowing) _reportLook();
+        },
+        child: WeatherPage(bottomInset: widget.bottomInset),
+      ),
+    );
+  }
+}
+
+/// First launch: nothing saved, so invite the user to add a place.
+class _NoPlaces extends StatelessWidget {
+  const _NoPlaces();
+
+  @override
+  Widget build(BuildContext context) {
+    final places = context.read<PlacesCubit>();
+    return SafeArea(
+      child: Column(
+        children: [
+          WeatherHeader(
+            city: null,
+            fetchedAt: null,
+            isRefreshing: false,
+            onSearch: () => openCitySearch(context),
+            onUseLocation: places.showCurrentLocation,
+            onRefresh: null,
           ),
-          padding: _padding.copyWith(bottom: _padding.bottom + bottomInset),
-          child: widget.builder(viewportHeight.clamp(0, double.infinity)),
-        );
-      },
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: MaxWidth(
+                    maxWidth: Breakpoints.maxFormWidth,
+                    alignment: Alignment.center,
+                    child: Center(
+                      child: EmptyView(
+                        onSearch: () => openCitySearch(context),
+                        onUseLocation: places.showCurrentLocation,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

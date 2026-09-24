@@ -49,11 +49,14 @@ class TactileButton extends StatelessWidget {
             ),
             SizedBox(width: isCompact ? 6 : 10),
           ],
-          Text(
-            label,
-            style:
-                (isCompact ? AppTextStyles.caption : AppTextStyles.bodyStrong)
-                    .copyWith(color: foreground, fontWeight: FontWeight.w700),
+          Flexible(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style:
+                  (isCompact ? AppTextStyles.caption : AppTextStyles.bodyStrong)
+                      .copyWith(color: foreground, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),

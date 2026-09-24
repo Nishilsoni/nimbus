@@ -10,12 +10,15 @@ class GeocodingRemoteDataSource {
 
   /// Returns an empty list when nothing matches. Throws an [AppException]
   /// on any failure.
-  Future<List<CityModel>> searchCities(String query) async {
+  Future<List<CityModel>> searchCities(
+    String query, {
+    String languageCode = 'en',
+  }) async {
     final uri =
         Uri.https(ApiConstants.geocodingHost, ApiConstants.geocodingPath, {
           'name': query,
           'count': '${ApiConstants.searchResultLimit}',
-          'language': 'en',
+          'language': languageCode,
           'format': 'json',
         });
 

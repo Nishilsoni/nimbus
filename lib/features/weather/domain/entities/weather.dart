@@ -1,8 +1,9 @@
 import 'package:equatable/equatable.dart';
 
+import 'package:nimbus/features/weather/domain/entities/forecast.dart';
 import 'package:nimbus/features/weather/domain/entities/weather_condition.dart';
 
-/// Current conditions plus today's highs and lows.
+/// Current conditions, today's highs and lows, and the forecast.
 ///
 /// Units are metric: °C, km/h, mm and hPa. Times are the location's local
 /// wall-clock time.
@@ -22,6 +23,8 @@ class Weather extends Equatable {
     this.uvIndex,
     this.sunrise,
     this.sunset,
+    this.hourly = const [],
+    this.daily = const [],
   });
 
   final WeatherCondition condition;
@@ -41,6 +44,12 @@ class Weather extends Equatable {
   final DateTime? sunrise;
   final DateTime? sunset;
 
+  /// The next 24 hours, starting with the current hour.
+  final List<HourlyForecast> hourly;
+
+  /// Seven days, starting today.
+  final List<DailyForecast> daily;
+
   @override
   List<Object?> get props => [
     condition,
@@ -57,5 +66,7 @@ class Weather extends Equatable {
     uvIndex,
     sunrise,
     sunset,
+    hourly,
+    daily,
   ];
 }

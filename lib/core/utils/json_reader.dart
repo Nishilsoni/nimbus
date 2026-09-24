@@ -30,6 +30,23 @@ extension JsonReader on Map<String, dynamic> {
     return value is String && value.isNotEmpty ? value : null;
   }
 
+  /// A column of values, e.g. `hourly.temperature_2m`. Entries may be null
+  /// where the API has no data.
+  List<T?> listOf<T>(String key) {
+    final list = require<List<dynamic>>(key);
+    return [
+      for (final (index, value) in list.indexed)
+        if (value == null)
+          null
+        else if (value is T)
+          value
+        else
+          throw FormatException(
+            'Expected "$key[$index]" to be $T, got ${value.runtimeType}',
+          ),
+    ];
+  }
+
   /// Open-Meteo returns daily values as arrays, one entry per day.
   /// We only request today, so read the first element.
   T? firstOf<T>(String key) {

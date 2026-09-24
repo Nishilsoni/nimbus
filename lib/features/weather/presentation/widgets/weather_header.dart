@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:nimbus/core/constants/app_strings.dart';
+import 'package:nimbus/core/l10n/l10n.dart';
+import 'package:nimbus/core/layout/breakpoints.dart';
 import 'package:nimbus/core/theme/app_text_styles.dart';
 import 'package:nimbus/core/theme/surface_palette.dart';
 import 'package:nimbus/core/widgets/motion/smooth_switcher.dart';
 import 'package:nimbus/core/widgets/relative_time_text.dart';
 import 'package:nimbus/core/widgets/tactile/tactile_button.dart';
-import 'package:nimbus/features/appearance/presentation/widgets/appearance_button.dart';
+import 'package:nimbus/features/settings/presentation/widgets/settings_button.dart';
 import 'package:nimbus/features/weather/domain/entities/city.dart';
 import 'package:nimbus/features/weather/presentation/widgets/search_hero.dart';
 
-/// City name, freshness, and the screen's actions.
+/// Place name, freshness, and the screen's actions.
 class WeatherHeader extends StatelessWidget {
   const WeatherHeader({
     super.key,
@@ -19,6 +20,8 @@ class WeatherHeader extends StatelessWidget {
     required this.onSearch,
     required this.onUseLocation,
     required this.onRefresh,
+    this.placeholderTitle,
+    this.showsLocationIcon = false,
   });
 
   final City? city;
@@ -30,36 +33,50 @@ class WeatherHeader extends StatelessWidget {
   /// `null` hides the refresh button (nothing to refresh yet).
   final VoidCallback? onRefresh;
 
-  // Compact enough that four buttons leave room for the city name.
-  static const _buttonSize = 42.0;
-  static const _buttonGap = 12.0;
+  /// Shown while [city] is unknown, e.g. "My location" before a GPS fix.
+  final String? placeholderTitle;
+
+  /// Marks the title as the device's location.
+  final bool showsLocationIcon;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final onRefresh = this.onRefresh;
+    final isNarrow =
+        MediaQuery.sizeOf(context).width < Breakpoints.narrowHeader;
+    // Compact enough that four buttons leave room for the place name.
+    final buttonSize = isNarrow ? 38.0 : 42.0;
+    final gap = isNarrow ? 9.0 : 12.0;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 12, 18, 8),
+      padding: EdgeInsets.fromLTRB(isNarrow ? 18 : 24, 12, 18, 8),
       child: Row(
         children: [
           Expanded(
-            child: _Title(city: city, fetchedAt: fetchedAt),
+            child: _Title(
+              city: city,
+              fetchedAt: fetchedAt,
+              placeholder: placeholderTitle ?? l10n.appName,
+              showsLocationIcon: showsLocationIcon,
+            ),
           ),
-          const SizedBox(width: 10),
-          const AppearanceButton(size: _buttonSize),
-          const SizedBox(width: _buttonGap),
+          SizedBox(width: gap),
+          SettingsButton(size: buttonSize),
+          SizedBox(width: gap),
           TactileIconButton(
             icon: Icons.my_location_rounded,
-            tooltip: AppStrings.useMyLocation,
+            tooltip: l10n.useMyLocation,
             onPressed: onUseLocation,
-            size: _buttonSize,
+            size: buttonSize,
           ),
-          const SizedBox(width: _buttonGap),
+          SizedBox(width: gap),
           SearchHero(
             child: TactileIconButton(
               icon: Icons.search_rounded,
-              tooltip: AppStrings.searchCity,
+              tooltip: l10n.searchCity,
               onPressed: onSearch,
-              size: _buttonSize,
+              size: buttonSize,
             ),
           ),
           // Slides in once there's something to refresh.
@@ -69,17 +86,15 @@ class WeatherHeader extends StatelessWidget {
             child: onRefresh == null
                 ? const SizedBox.shrink()
                 : Padding(
-                    padding: const EdgeInsets.only(left: _buttonGap),
+                    padding: EdgeInsets.only(left: gap),
                     child: TactileIconButton(
                       icon: Icons.refresh_rounded,
-                      tooltip: isRefreshing
-                          ? AppStrings.refreshing
-                          : AppStrings.refresh,
+                      tooltip: isRefreshing ? l10n.refreshing : l10n.refresh,
                       // Pressed in and spinning while busy; disabled so
                       // repeated taps can't queue duplicate requests.
                       isBusy: isRefreshing,
                       onPressed: onRefresh,
-                      size: _buttonSize,
+                      size: buttonSize,
                     ),
                   ),
           ),
@@ -90,13 +105,21 @@ class WeatherHeader extends StatelessWidget {
 }
 
 class _Title extends StatelessWidget {
-  const _Title({required this.city, required this.fetchedAt});
+  const _Title({
+    required this.city,
+    required this.fetchedAt,
+    required this.placeholder,
+    required this.showsLocationIcon,
+  });
 
   final City? city;
   final DateTime? fetchedAt;
+  final String placeholder;
+  final bool showsLocationIcon;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final palette = context.palette;
     final city = this.city;
     final fetchedAt = this.fetchedAt;
@@ -106,51 +129,41 @@ class _Title extends StatelessWidget {
 
     return SmoothSwitcher(
       alignment: Alignment.centerLeft,
-      child: city == null
-          ? const Align(
-              key: ValueKey('app-name'),
-              alignment: Alignment.centerLeft,
-              child: Text(AppStrings.appName, style: AppTextStyles.headline),
-            )
-          : Column(
-              key: ValueKey(city),
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    if (city.isCurrentLocation) ...[
-                      Icon(
-                        Icons.near_me_rounded,
-                        size: 18,
-                        color: palette.accent,
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Flexible(
-                      child: Text(
-                        city.name,
-                        style: AppTextStyles.cityTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                if (city.subtitle.isNotEmpty)
-                  Text(
-                    city.subtitle,
-                    style: secondary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                if (fetchedAt != null)
-                  RelativeTimeText(
-                    time: fetchedAt,
-                    builder: AppStrings.updated,
-                    style: secondary.copyWith(color: palette.textMuted),
-                  ),
+      child: Column(
+        key: ValueKey(city ?? placeholder),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (showsLocationIcon) ...[
+                Icon(Icons.near_me_rounded, size: 18, color: palette.accent),
+                const SizedBox(width: 6),
               ],
+              Flexible(
+                child: Text(
+                  city?.name ?? placeholder,
+                  style: AppTextStyles.cityTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          if (city != null && city.subtitle.isNotEmpty)
+            Text(
+              city.subtitle,
+              style: secondary,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
+          if (fetchedAt != null)
+            RelativeTimeText(
+              time: fetchedAt,
+              builder: l10n.updated,
+              style: secondary.copyWith(color: palette.textMuted),
+            ),
+        ],
+      ),
     );
   }
 }

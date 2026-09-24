@@ -3,13 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:nimbus/app/app.dart';
 import 'package:nimbus/app/dependencies.dart';
-import 'package:nimbus/core/constants/app_strings.dart';
 import 'package:nimbus/core/network/network_info.dart';
-import 'package:nimbus/features/appearance/data/appearance_repository_impl.dart';
-import 'package:nimbus/features/appearance/domain/appearance_mode.dart';
+import 'package:nimbus/features/settings/data/settings_repository_impl.dart';
+import 'package:nimbus/features/settings/domain/app_settings.dart';
 import 'package:nimbus/features/weather/presentation/widgets/empty_view.dart';
 import 'package:nimbus/features/weather/presentation/widgets/refresh_status_banner.dart';
 import 'package:nimbus/features/weather/presentation/widgets/weather_content.dart';
+import 'package:nimbus/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Lets the test switch the app "offline" without touching the device's
@@ -67,13 +67,14 @@ void main() {
     // Start in light mode so the screenshots don't depend on the time of
     // day; the dark look is captured at the end.
     await preferences.setString(
-      AppearanceRepositoryImpl.storageKey,
+      SettingsRepositoryImpl.appearanceKey,
       AppearanceMode.light.name,
     );
     final network = _SwitchableNetworkInfo();
     final dependencies = await AppDependencies.create(networkInfo: network);
 
     await tester.pumpWidget(NimbusApp(dependencies: dependencies));
+    final l10n = AppLocalizations.of(tester.element(find.byType(NimbusApp)));
     await pumpFor(tester, const Duration(milliseconds: 2000));
     await screenshot('01_splash');
 
@@ -83,10 +84,10 @@ void main() {
     await screenshot('02_welcome');
 
     // An invalid city gets a clear "not found" message.
-    await tester.tap(find.byTooltip(AppStrings.searchCity));
+    await tester.tap(find.byTooltip(l10n.searchCity));
     await pumpFor(tester, const Duration(milliseconds: 600));
     await tester.enterText(find.byType(TextField), 'Qwzxvbn');
-    await pumpUntil(tester, find.text(AppStrings.cityNotFoundTitle));
+    await pumpUntil(tester, find.text(l10n.cityNotFoundTitle));
     await pumpFor(tester, const Duration(milliseconds: 500));
     await screenshot('03_city_not_found');
 
@@ -104,16 +105,16 @@ void main() {
 
     // Refreshing offline keeps the weather on screen and explains why.
     network.online = false;
-    await tester.tap(find.byTooltip(AppStrings.refresh));
+    await tester.tap(find.byTooltip(l10n.refresh));
     await pumpUntil(tester, find.byType(RefreshStatusBanner));
     await pumpFor(tester, const Duration(milliseconds: 600));
     expect(find.byType(WeatherContent), findsOneWidget);
-    expect(find.text(AppStrings.noInternetTitle), findsOneWidget);
+    expect(find.text(l10n.noInternetTitle), findsOneWidget);
     await screenshot('06_refresh_failed');
 
     // Back online, "Try again" recovers and the banner goes away.
     network.online = true;
-    await tester.tap(find.text(AppStrings.tryAgain));
+    await tester.tap(find.text(l10n.tryAgain));
     await pumpUntil(tester, find.byType(RefreshStatusBanner), present: false);
     expect(find.byType(WeatherContent), findsOneWidget);
 
@@ -127,14 +128,15 @@ void main() {
 
     // GPS: the simulator's location permission is granted by the run
     // script, so this resolves without a system prompt.
-    await tester.tap(find.byTooltip(AppStrings.useMyLocation));
+    await tester.tap(find.byTooltip(l10n.useMyLocation));
     await pumpUntil(tester, find.byIcon(Icons.near_me_rounded));
     await pumpFor(tester, const Duration(seconds: 1));
     await screenshot('08_current_location');
 
     // The appearance toggle switches the whole app to the dark look.
-    await tester.tap(find.byTooltip(AppStrings.appearanceLight));
-    await pumpUntil(tester, find.byTooltip(AppStrings.appearanceDark));
+    await tester.tap(find.byTooltip(l10n.settings));
+    await tester.tap(find.text(l10n.themeLight));
+    await pumpUntil(tester, find.text(l10n.themeDark));
     await pumpFor(tester, const Duration(milliseconds: 1500));
     await screenshot('09_dark_mode');
   });
@@ -148,13 +150,13 @@ void main() {
     final dependencies = await AppDependencies.create(networkInfo: network);
 
     await tester.pumpWidget(NimbusApp(dependencies: dependencies));
+    final l10n = AppLocalizations.of(tester.element(find.byType(NimbusApp)));
     await pumpUntil(tester, find.byType(RefreshStatusBanner));
     await pumpFor(tester, const Duration(seconds: 1));
 
     expect(find.byType(WeatherContent), findsOneWidget);
     expect(find.byIcon(Icons.near_me_rounded), findsOneWidget);
-    expect(find.text(AppStrings.noInternetTitle), findsOneWidget);
-    expect(find.byTooltip(AppStrings.appearanceDark), findsOneWidget);
+    expect(find.text(l10n.noInternetTitle), findsOneWidget);
     await screenshot('10_offline_cached');
   });
 }

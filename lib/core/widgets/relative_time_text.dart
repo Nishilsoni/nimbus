@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:nimbus/core/l10n/l10n.dart';
 import 'package:nimbus/core/utils/date_formatter.dart';
 
 /// Text such as "Updated 5 min ago" that keeps itself current.
@@ -47,7 +48,7 @@ class _RelativeTimeTextState extends State<RelativeTimeText> {
   @override
   Widget build(BuildContext context) {
     return Text(
-      widget.builder(DateFormatter.relative(widget.time)),
+      widget.builder(DateFormatter.relative(widget.time, context.l10n)),
       style: widget.style,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,

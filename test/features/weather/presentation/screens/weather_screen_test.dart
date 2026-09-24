@@ -1,168 +1,117 @@
-import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:nimbus/core/constants/app_strings.dart';
-import 'package:nimbus/core/error/failures.dart';
-import 'package:nimbus/core/widgets/tactile/tactile_pressable.dart';
-import 'package:nimbus/features/appearance/domain/appearance_mode.dart';
-import 'package:nimbus/features/appearance/domain/appearance_repository.dart';
-import 'package:nimbus/features/appearance/presentation/appearance_cubit.dart';
-import 'package:nimbus/features/weather/presentation/cubit/weather_cubit.dart';
-import 'package:nimbus/features/weather/presentation/cubit/weather_state.dart';
+import 'package:nimbus/core/utils/result.dart';
+import 'package:nimbus/features/settings/presentation/settings_cubit.dart';
+import 'package:nimbus/features/weather/domain/entities/city.dart';
+import 'package:nimbus/features/weather/domain/entities/place.dart';
+import 'package:nimbus/features/weather/domain/entities/saved_places.dart';
+import 'package:nimbus/features/weather/domain/repositories/location_repository.dart';
+import 'package:nimbus/features/weather/domain/repositories/weather_repository.dart';
+import 'package:nimbus/features/weather/presentation/cubit/places_cubit.dart';
+import 'package:nimbus/features/weather/presentation/cubit/weather_look_cubit.dart';
 import 'package:nimbus/features/weather/presentation/screens/weather_screen.dart';
 import 'package:nimbus/features/weather/presentation/widgets/empty_view.dart';
-import 'package:nimbus/features/weather/presentation/widgets/error_view.dart';
-import 'package:nimbus/features/weather/presentation/widgets/loading_view.dart';
-import 'package:nimbus/features/weather/presentation/widgets/refresh_status_banner.dart';
-import 'package:nimbus/features/weather/presentation/widgets/weather_content.dart';
+import 'package:nimbus/features/weather/presentation/widgets/page_dots.dart';
 
+import '../../../../helpers/fakes.dart';
+import '../../../../helpers/pump_app.dart';
 import '../../../../helpers/test_data.dart';
 
-class _MockWeatherCubit extends MockCubit<WeatherState>
-    implements WeatherCubit {}
-
-class _FixedAppearance implements AppearanceRepository {
-  @override
-  AppearanceMode load() => AppearanceMode.automatic;
-
-  @override
-  Future<void> save(AppearanceMode mode) async {}
-}
-
 void main() {
-  late _MockWeatherCubit cubit;
+  late MockWeatherRepository weatherRepository;
+  late PlacesCubit places;
+  late WeatherLookCubit look;
 
-  final showingData = WeatherState(
-    status: WeatherStatus.success,
-    report: TestData.report(),
-  );
-
-  setUp(() {
-    cubit = _MockWeatherCubit();
-    when(() => cubit.refresh()).thenAnswer((_) async {});
-    when(() => cubit.useCurrentLocation()).thenAnswer((_) async {});
+  setUpAll(() {
+    registerFallbackValue(TestData.ahmedabad);
+    registerFallbackValue(const CurrentLocationPlace());
   });
 
-  Future<void> pumpScreen(WidgetTester tester, WeatherState state) async {
-    when(() => cubit.state).thenReturn(state);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: MultiBlocProvider(
+  setUp(() {
+    weatherRepository = MockWeatherRepository();
+    when(() => weatherRepository.getCachedReport(any())).thenReturn(null);
+    when(() => weatherRepository.getWeather(any())).thenAnswer(
+      (invocation) async => Ok(
+        TestData.report(city: invocation.positionalArguments.first as City),
+      ),
+    );
+    look = WeatherLookCubit();
+  });
+
+  Future<void> pumpScreen(WidgetTester tester, SavedPlaces saved) async {
+    places = PlacesCubit(FakePlacesRepository(saved));
+    await tester.pumpApp(
+      MultiRepositoryProvider(
+        providers: [
+          RepositoryProvider<WeatherRepository>.value(value: weatherRepository),
+          RepositoryProvider<LocationRepository>.value(
+            value: MockLocationRepository(),
+          ),
+        ],
+        child: MultiBlocProvider(
           providers: [
-            BlocProvider<WeatherCubit>.value(value: cubit),
-            BlocProvider(create: (_) => AppearanceCubit(_FixedAppearance())),
+            BlocProvider.value(value: places),
+            BlocProvider.value(value: look),
+            BlocProvider(
+              create: (_) => SettingsCubit(FakeSettingsRepository()),
+            ),
           ],
           child: const WeatherScreen(),
         ),
       ),
     );
-    // The illustration animates forever, so pump fixed times rather than
-    // waiting to settle: first to fire every staggered entrance's start
-    // timer, then to let those entrances and the counting temperature end.
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.pump(const Duration(milliseconds: 1500));
+    await tester.pumpEntrances();
   }
 
-  testWidgets('shows the welcome view before any city is chosen', (
-    tester,
-  ) async {
-    await pumpScreen(tester, const WeatherState());
+  testWidgets('welcomes the user when no places are saved', (tester) async {
+    await pumpScreen(tester, const SavedPlaces());
 
     expect(find.byType(EmptyView), findsOneWidget);
-    expect(find.byTooltip(AppStrings.refresh), findsNothing);
+    expect(find.byType(PageView), findsNothing);
   });
 
-  testWidgets('shows a skeleton while the first load runs', (tester) async {
-    await pumpScreen(tester, const WeatherState(status: WeatherStatus.loading));
+  testWidgets('shows one page per place, with page dots', (tester) async {
+    await pumpScreen(
+      tester,
+      const SavedPlaces(cities: [TestData.ahmedabad, TestData.london]),
+    );
 
-    expect(find.byType(LoadingView), findsOneWidget);
-  });
-
-  testWidgets('shows the weather for the selected city', (tester) async {
-    await pumpScreen(tester, showingData);
-
-    expect(find.byType(WeatherContent), findsOneWidget);
+    expect(find.byType(PageView), findsOneWidget);
+    expect(find.byType(PageDots), findsOneWidget);
     expect(find.text('Ahmedabad'), findsOneWidget);
-    expect(find.text('33°'), findsOneWidget);
-    expect(find.text(AppStrings.conditionClear), findsOneWidget);
-    expect(find.byType(RefreshStatusBanner), findsNothing);
   });
 
-  testWidgets('keeps the weather on screen and explains when a refresh fails', (
+  testWidgets('hides the dots when there is only one place', (tester) async {
+    await pumpScreen(tester, const SavedPlaces(cities: [TestData.london]));
+
+    expect(find.byType(PageDots), findsNothing);
+  });
+
+  testWidgets('swiping moves to the next place and themes the app for it', (
     tester,
   ) async {
     await pumpScreen(
       tester,
-      showingData.copyWith(failure: const NoInternetFailure()),
+      const SavedPlaces(cities: [TestData.ahmedabad, TestData.london]),
     );
 
-    expect(find.byType(WeatherContent), findsOneWidget);
-    expect(find.byType(RefreshStatusBanner), findsOneWidget);
-    expect(find.text(AppStrings.noInternetTitle), findsOneWidget);
+    await tester.fling(find.byType(PageView), const Offset(-400, 0), 1500);
+    await tester.pumpEntrances();
 
-    await tester.tap(find.text(AppStrings.tryAgain));
-    verify(() => cubit.refresh()).called(1);
+    expect(places.state.selectedIndex, 1);
+    expect(find.text('London'), findsOneWidget);
+    expect(look.state.condition, TestData.weather.condition);
   });
 
-  testWidgets('shows a full-screen error when there is nothing to fall back '
-      'on', (tester) async {
-    await pumpScreen(
-      tester,
-      const WeatherState(
-        status: WeatherStatus.failure,
-        failure: TimeoutFailure(),
-      ),
-    );
+  testWidgets('moves to a place when it is added', (tester) async {
+    await pumpScreen(tester, const SavedPlaces(cities: [TestData.ahmedabad]));
 
-    expect(find.byType(ErrorView), findsOneWidget);
-    expect(find.text(AppStrings.timeoutTitle), findsOneWidget);
+    await places.addCity(TestData.london);
+    await tester.pumpEntrances();
 
-    await tester.tap(find.text(AppStrings.tryAgain));
-    verify(() => cubit.refresh()).called(1);
-  });
-
-  testWidgets('offers to retry the location when permission was denied', (
-    tester,
-  ) async {
-    await pumpScreen(
-      tester,
-      const WeatherState(
-        status: WeatherStatus.failure,
-        failure: LocationFailure(LocationFailureReason.permissionDenied),
-      ),
-    );
-
-    await tester.tap(find.text(AppStrings.tryAgain));
-    verify(() => cubit.useCurrentLocation()).called(1);
-  });
-
-  testWidgets('disables the refresh button while refreshing', (tester) async {
-    await pumpScreen(tester, showingData.copyWith(isRefreshing: true));
-
-    final button = tester.widget<TactilePressable>(
-      find.descendant(
-        of: find.byTooltip(AppStrings.refreshing),
-        matching: find.byType(TactilePressable),
-      ),
-    );
-    expect(button.onPressed, isNull);
-    expect(button.isActive, isTrue);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
-  });
-
-  testWidgets('pull-to-refresh asks the cubit to refresh', (tester) async {
-    await pumpScreen(tester, showingData);
-
-    await tester.fling(
-      find.byType(SingleChildScrollView),
-      const Offset(0, 400),
-      1000,
-    );
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    verify(() => cubit.refresh()).called(1);
+    expect(find.text('London'), findsOneWidget);
+    verify(() => weatherRepository.getWeather(TestData.london)).called(1);
   });
 }

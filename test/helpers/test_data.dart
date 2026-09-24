@@ -1,4 +1,5 @@
 import 'package:nimbus/features/weather/domain/entities/city.dart';
+import 'package:nimbus/features/weather/domain/entities/forecast.dart';
 import 'package:nimbus/features/weather/domain/entities/weather.dart';
 import 'package:nimbus/features/weather/domain/entities/weather_condition.dart';
 import 'package:nimbus/features/weather/domain/entities/weather_report.dart';
@@ -35,6 +36,30 @@ abstract final class TestData {
     isCurrentLocation: true,
   );
 
+  static final hourly = [
+    for (var hour = 0; hour < 24; hour++)
+      HourlyForecast(
+        time: DateTime(2026, 9, 24, 21).add(Duration(hours: hour)),
+        temperature: 30 - (hour % 12) * 0.5,
+        condition: hour.isEven
+            ? WeatherCondition.clear
+            : WeatherCondition.partlyCloudy,
+        isDay: hour > 9 && hour < 21,
+        precipitationChance: hour == 5 ? 40 : 0,
+      ),
+  ];
+
+  static final daily = [
+    for (var day = 0; day < 7; day++)
+      DailyForecast(
+        date: DateTime(2026, 9, 24 + day),
+        condition: day == 2 ? WeatherCondition.rain : WeatherCondition.cloudy,
+        high: 36.7 - day,
+        low: 27.4 - day / 2,
+        precipitationChance: day == 2 ? 70 : 0,
+      ),
+  ];
+
   static final weather = Weather(
     condition: WeatherCondition.clear,
     isDay: false,
@@ -50,6 +75,8 @@ abstract final class TestData {
     uvIndex: 7.4,
     sunrise: DateTime(2026, 9, 24, 6, 28),
     sunset: DateTime(2026, 9, 24, 18, 34),
+    hourly: hourly,
+    daily: daily,
   );
 
   static final fetchedAt = DateTime(2026, 9, 24, 21, 5);

@@ -9,6 +9,7 @@ import 'package:nimbus/features/weather/data/datasources/weather_remote_data_sou
 import 'package:nimbus/features/weather/data/models/city_model.dart';
 import 'package:nimbus/features/weather/data/models/weather_report_model.dart';
 import 'package:nimbus/features/weather/domain/entities/city.dart';
+import 'package:nimbus/features/weather/domain/entities/place.dart';
 import 'package:nimbus/features/weather/domain/entities/weather_report.dart';
 import 'package:nimbus/features/weather/domain/repositories/weather_repository.dart';
 
@@ -42,21 +43,25 @@ class WeatherRepositoryImpl implements WeatherRepository {
         weather: weather,
         fetchedAt: _clock(),
       );
-      await _saveToCache(report);
+      await _saveToCache(Place.of(city), report);
       return report.toEntity();
     });
   }
 
   @override
-  Future<WeatherReport?> getLastReport() async {
-    final cached = await _local.readLastReport();
-    return cached?.toEntity();
-  }
+  WeatherReport? getCachedReport(Place place) =>
+      _local.readReport(place.id)?.toEntity();
 
   @override
-  Future<Result<List<City>>> searchCities(String query) async {
+  Future<Result<List<City>>> searchCities(
+    String query, {
+    String languageCode = 'en',
+  }) async {
     final result = await _guard(() async {
-      final cities = await _geocodingRemote.searchCities(query);
+      final cities = await _geocodingRemote.searchCities(
+        query,
+        languageCode: languageCode,
+      );
       return cities.map((city) => city.toEntity()).toList(growable: false);
     });
     return switch (result) {
@@ -68,9 +73,9 @@ class WeatherRepositoryImpl implements WeatherRepository {
   }
 
   /// A failed cache write must never turn a successful fetch into an error.
-  Future<void> _saveToCache(WeatherReportModel report) async {
+  Future<void> _saveToCache(Place place, WeatherReportModel report) async {
     try {
-      await _local.saveReport(report);
+      await _local.saveReport(place.id, report);
     } on Exception catch (error) {
       developer.log('Could not cache weather', error: error, name: 'nimbus');
     }

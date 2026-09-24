@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:nimbus/core/constants/app_strings.dart';
+import 'package:nimbus/core/l10n/l10n.dart';
 import 'package:nimbus/core/widgets/skeleton.dart';
 import 'package:nimbus/core/widgets/tactile/tactile_surface.dart';
 
@@ -11,7 +11,7 @@ class LoadingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: AppStrings.loadingWeather,
+      label: context.l10n.loadingWeather,
       child: const SkeletonPulse(
         child: Column(
           children: [

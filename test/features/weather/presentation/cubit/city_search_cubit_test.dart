@@ -28,7 +28,12 @@ void main() {
   );
 
   void stubSearch(String query, Result<List<City>> result) {
-    when(() => repository.searchCities(query)).thenAnswer((_) async => result);
+    when(
+      () => repository.searchCities(
+        query,
+        languageCode: any(named: 'languageCode'),
+      ),
+    ).thenAnswer((_) async => result);
   }
 
   blocTest<CitySearchCubit, CitySearchState>(
@@ -49,7 +54,9 @@ void main() {
       ),
     ],
     verify: (_) {
-      verify(() => repository.searchCities('Ahme')).called(1);
+      verify(
+        () => repository.searchCities('Ahme', languageCode: 'en'),
+      ).called(1);
       verifyNoMoreInteractions(repository);
     },
   );
@@ -66,6 +73,20 @@ void main() {
     wait: afterDebounce,
     expect: () => const [CitySearchState()],
     verify: (_) => verifyZeroInteractions(repository),
+  );
+
+  blocTest<CitySearchCubit, CitySearchState>(
+    'searches in the app language',
+    setUp: () => stubSearch('Delhi', const Ok([TestData.ahmedabad])),
+    build: () => CitySearchCubit(
+      weatherRepository: repository,
+      languageCode: 'hi',
+      debounceDuration: debounce,
+    ),
+    act: (cubit) => cubit.submit('Delhi'),
+    verify: (_) => verify(
+      () => repository.searchCities('Delhi', languageCode: 'hi'),
+    ).called(1),
   );
 
   blocTest<CitySearchCubit, CitySearchState>(
@@ -115,14 +136,21 @@ void main() {
       await cubit.submit('Paris');
       await cubit.retry();
     },
-    verify: (_) => verify(() => repository.searchCities('Paris')).called(2),
+    verify: (_) => verify(
+      () => repository.searchCities('Paris', languageCode: 'en'),
+    ).called(2),
   );
 
   blocTest<CitySearchCubit, CitySearchState>(
     'drops results that arrive after the query was cleared',
     setUp: () {
       final slow = Completer<Result<List<City>>>();
-      when(() => repository.searchCities('London')).thenAnswer((_) {
+      when(
+        () => repository.searchCities(
+          'London',
+          languageCode: any(named: 'languageCode'),
+        ),
+      ).thenAnswer((_) {
         Future<void>.delayed(
           const Duration(milliseconds: 20),
           () => slow.complete(const Ok([TestData.london])),

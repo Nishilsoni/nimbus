@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:nimbus/core/constants/app_strings.dart';
 import 'package:nimbus/core/error/failures.dart';
+import 'package:nimbus/core/l10n/l10n.dart';
 import 'package:nimbus/core/theme/surface_palette.dart';
 import 'package:nimbus/core/widgets/status_message.dart';
 import 'package:nimbus/core/widgets/tactile/tactile_button.dart';
@@ -23,13 +23,14 @@ class ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return StatusMessage(
       visual: StatusIcon(failure.icon, color: context.palette.warning),
-      title: failure.title,
-      message: failure.message,
+      title: failure.title(l10n),
+      message: failure.message(l10n),
       actions: [
         TactileButton(
-          label: failure.actionLabel,
+          label: failure.actionLabel(l10n),
           icon: failure.action == FailureAction.openSettings
               ? Icons.settings_rounded
               : Icons.refresh_rounded,
@@ -37,7 +38,7 @@ class ErrorView extends StatelessWidget {
           isPrimary: true,
         ),
         TactileButton(
-          label: AppStrings.searchCity,
+          label: l10n.searchCity,
           icon: Icons.search_rounded,
           onPressed: onSearch,
         ),

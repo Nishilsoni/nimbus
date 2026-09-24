@@ -9,14 +9,40 @@ import '../../../../helpers/test_data.dart';
 
 void main() {
   group('WeatherModel', () {
-    test('parses a real Open-Meteo forecast response', () {
-      final weather = WeatherModel.fromJson(
-        jsonFixture('forecast_response.json'),
-      ).toEntity();
+    final weather = WeatherModel.fromJson(
+      jsonFixture('forecast_response.json'),
+    ).toEntity();
 
-      expect(weather, TestData.weather);
+    test('parses current conditions from a real response', () {
+      expect(weather.temperature, 30.2);
+      expect(weather.feelsLike, 34.8);
+      expect(weather.humidity, 71);
       expect(weather.condition, WeatherCondition.clear);
       expect(weather.isDay, isFalse);
+      expect(weather.observedAt, DateTime(2026, 9, 24, 23));
+    });
+
+    test("takes today's range, UV and sun times from the first day", () {
+      expect(weather.highTemperature, 36.7);
+      expect(weather.lowTemperature, 27.4);
+      expect(weather.uvIndex, 7.4);
+      expect(weather.sunrise, DateTime(2026, 9, 24, 6, 28));
+      expect(weather.sunset, DateTime(2026, 9, 24, 18, 34));
+    });
+
+    test('keeps exactly 24 hours, starting at the current hour', () {
+      // The fixture's first slot (22:00) is before "now" (23:00).
+      expect(weather.hourly, hasLength(24));
+      expect(weather.hourly.first.time, DateTime(2026, 9, 24, 23));
+      expect(weather.hourly.first.temperature, 29.9);
+      expect(weather.hourly.last.time, DateTime(2026, 9, 25, 22));
+    });
+
+    test('parses seven days of forecast', () {
+      expect(weather.daily, hasLength(7));
+      expect(weather.daily[2].condition, WeatherCondition.drizzle);
+      expect(weather.daily[5].precipitationChance, 12);
+      expect(weather.daily[1].high, 35.2);
     });
 
     test('survives a toJson/fromJson round trip, as used by the cache', () {
@@ -29,17 +55,17 @@ void main() {
       expect(restored.toEntity(), original.toEntity());
     });
 
-    test('treats missing optional daily values as null', () {
+    test('treats missing optional values as null', () {
       final json = jsonFixture('forecast_response.json');
-      (json['daily'] as Map<String, dynamic>)
-        ..['uv_index_max'] = [null]
-        ..['sunrise'] = [null];
+      final daily = json['daily'] as Map<String, dynamic>;
+      (daily['uv_index_max'] as List<dynamic>)[0] = null;
+      (daily['sunrise'] as List<dynamic>)[0] = null;
 
-      final weather = WeatherModel.fromJson(json).toEntity();
+      final parsed = WeatherModel.fromJson(json).toEntity();
 
-      expect(weather.uvIndex, isNull);
-      expect(weather.sunrise, isNull);
-      expect(weather.sunset, isNotNull);
+      expect(parsed.uvIndex, isNull);
+      expect(parsed.sunrise, isNull);
+      expect(parsed.sunset, isNotNull);
     });
 
     test('throws a FormatException naming the missing field', () {
@@ -56,6 +82,15 @@ void main() {
           ),
         ),
       );
+    });
+
+    test('rejects forecast columns of different lengths', () {
+      final json = jsonFixture('forecast_response.json');
+      ((json['hourly'] as Map<String, dynamic>)['temperature_2m']
+              as List<dynamic>)
+          .removeLast();
+
+      expect(() => WeatherModel.fromJson(json), throwsFormatException);
     });
   });
 
@@ -84,16 +119,20 @@ void main() {
 
   group('WeatherReportModel', () {
     test('round-trips city, weather and timestamp', () {
+      final weather = WeatherModel.fromJson(
+        jsonFixture('forecast_response.json'),
+      );
       final model = WeatherReportModel(
         city: CityModel.fromEntity(TestData.london),
-        weather: WeatherModel.fromJson(jsonFixture('forecast_response.json')),
+        weather: weather,
         fetchedAt: TestData.fetchedAt,
       );
 
-      expect(
-        WeatherReportModel.fromJson(model.toJson()).toEntity(),
-        TestData.report(city: TestData.london),
-      );
+      final restored = WeatherReportModel.fromJson(model.toJson()).toEntity();
+
+      expect(restored.city, TestData.london);
+      expect(restored.fetchedAt, TestData.fetchedAt);
+      expect(restored.weather, weather.toEntity());
     });
   });
 }

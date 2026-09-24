@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:nimbus/core/error/failures.dart';
 import 'package:nimbus/core/utils/result.dart';
-import 'package:nimbus/features/weather/domain/entities/city.dart';
+import 'package:nimbus/features/weather/domain/entities/place.dart';
 import 'package:nimbus/features/weather/domain/entities/weather_report.dart';
 import 'package:nimbus/features/weather/domain/repositories/location_repository.dart';
 import 'package:nimbus/features/weather/domain/repositories/weather_repository.dart';
@@ -22,9 +22,11 @@ void main() {
   late _MockWeatherRepository weatherRepository;
   late _MockLocationRepository locationRepository;
 
+  const ahmedabadPage = CityPlace(TestData.ahmedabad);
+  const locationPage = CurrentLocationPlace();
+
   final cachedReport = TestData.report(at: DateTime(2026, 9, 24, 8));
   final liveReport = TestData.report();
-  final londonReport = TestData.report(city: TestData.london);
 
   const noInternet = NoInternetFailure();
   const permissionDenied = LocationFailure(
@@ -38,57 +40,88 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(TestData.ahmedabad);
+    registerFallbackValue(ahmedabadPage);
     registerFallbackValue(LocationFailureReason.unavailable);
   });
 
   setUp(() {
     weatherRepository = _MockWeatherRepository();
     locationRepository = _MockLocationRepository();
+    when(() => weatherRepository.getCachedReport(any())).thenReturn(null);
   });
 
-  WeatherCubit buildCubit() => WeatherCubit(
+  WeatherCubit buildCubit({Place place = ahmedabadPage}) => WeatherCubit(
+    place: place,
     weatherRepository: weatherRepository,
     locationRepository: locationRepository,
   );
 
-  void stubWeather(Result<WeatherReport> result, {City? forCity}) {
+  void stubWeather(Result<WeatherReport> result) {
     when(
-      () => weatherRepository.getWeather(forCity ?? any()),
+      () => weatherRepository.getWeather(any()),
     ).thenAnswer((_) async => result);
   }
 
-  test('starts with nothing to show', () {
-    expect(buildCubit().state, const WeatherState());
-  });
+  group('initial state', () {
+    test('is empty when nothing is cached', () {
+      expect(buildCubit().state, const WeatherState());
+    });
 
-  group('loadInitialWeather', () {
-    blocTest<WeatherCubit, WeatherState>(
-      'stays in the initial state when nothing is cached',
-      setUp: () => when(
-        () => weatherRepository.getLastReport(),
-      ).thenAnswer((_) async => null),
-      build: buildCubit,
-      act: (cubit) => cubit.loadInitialWeather(),
-      expect: () => <WeatherState>[],
-      verify: (_) => verifyNever(() => weatherRepository.getWeather(any())),
-    );
+    test("shows the place's cached report straight away", () {
+      when(
+        () => weatherRepository.getCachedReport(ahmedabadPage),
+      ).thenReturn(cachedReport);
 
-    blocTest<WeatherCubit, WeatherState>(
-      'shows the cached report at once, then replaces it with live data',
-      setUp: () {
-        when(
-          () => weatherRepository.getLastReport(),
-        ).thenAnswer((_) async => cachedReport);
-        stubWeather(Ok(liveReport));
-      },
-      build: buildCubit,
-      act: (cubit) => cubit.loadInitialWeather(),
-      expect: () => [
+      expect(
+        buildCubit().state,
         WeatherState(
           status: WeatherStatus.success,
           report: cachedReport,
           isFromCache: true,
         ),
+      );
+    });
+  });
+
+  group('refresh without data on screen', () {
+    blocTest<WeatherCubit, WeatherState>(
+      'shows loading, then the weather',
+      setUp: () => stubWeather(Ok(liveReport)),
+      build: buildCubit,
+      act: (cubit) => cubit.refresh(),
+      expect: () => [
+        const WeatherState(status: WeatherStatus.loading),
+        showingLive,
+      ],
+      verify: (_) => verify(
+        () => weatherRepository.getWeather(TestData.ahmedabad),
+      ).called(1),
+    );
+
+    blocTest<WeatherCubit, WeatherState>(
+      'shows loading, then a full-screen failure',
+      setUp: () => stubWeather(const Err(noInternet)),
+      build: buildCubit,
+      act: (cubit) => cubit.refresh(),
+      expect: () => [
+        const WeatherState(status: WeatherStatus.loading),
+        const WeatherState(status: WeatherStatus.failure, failure: noInternet),
+      ],
+    );
+  });
+
+  group('refresh with data on screen', () {
+    blocTest<WeatherCubit, WeatherState>(
+      'replaces cached data with live data',
+      setUp: () {
+        when(
+          () => weatherRepository.getCachedReport(ahmedabadPage),
+        ).thenReturn(cachedReport);
+        stubWeather(Ok(liveReport));
+      },
+      build: buildCubit,
+      act: (cubit) => cubit.refresh(),
+      expect: () => [
         WeatherState(
           status: WeatherStatus.success,
           report: cachedReport,
@@ -99,53 +132,6 @@ void main() {
       ],
     );
 
-    blocTest<WeatherCubit, WeatherState>(
-      'keeps showing the cached report when opened offline',
-      setUp: () {
-        when(
-          () => weatherRepository.getLastReport(),
-        ).thenAnswer((_) async => cachedReport);
-        stubWeather(const Err(noInternet));
-      },
-      build: buildCubit,
-      act: (cubit) => cubit.loadInitialWeather(),
-      skip: 2,
-      expect: () => [
-        WeatherState(
-          status: WeatherStatus.success,
-          report: cachedReport,
-          isFromCache: true,
-          failure: noInternet,
-        ),
-      ],
-    );
-  });
-
-  group('selectCity without data on screen', () {
-    blocTest<WeatherCubit, WeatherState>(
-      'shows loading, then the weather',
-      setUp: () => stubWeather(Ok(liveReport)),
-      build: buildCubit,
-      act: (cubit) => cubit.selectCity(TestData.ahmedabad),
-      expect: () => [
-        const WeatherState(status: WeatherStatus.loading),
-        showingLive,
-      ],
-    );
-
-    blocTest<WeatherCubit, WeatherState>(
-      'shows loading, then a full-screen failure',
-      setUp: () => stubWeather(const Err(noInternet)),
-      build: buildCubit,
-      act: (cubit) => cubit.selectCity(TestData.ahmedabad),
-      expect: () => [
-        const WeatherState(status: WeatherStatus.loading),
-        const WeatherState(status: WeatherStatus.failure, failure: noInternet),
-      ],
-    );
-  });
-
-  group('refresh with data on screen', () {
     blocTest<WeatherCubit, WeatherState>(
       'keeps the previous data visible when the refresh fails',
       setUp: () => stubWeather(const Err(noInternet)),
@@ -159,23 +145,33 @@ void main() {
     );
 
     blocTest<WeatherCubit, WeatherState>(
+      'keeps cached data when opened offline',
+      setUp: () {
+        when(
+          () => weatherRepository.getCachedReport(ahmedabadPage),
+        ).thenReturn(cachedReport);
+        stubWeather(const Err(noInternet));
+      },
+      build: buildCubit,
+      act: (cubit) => cubit.refresh(),
+      skip: 1,
+      expect: () => [
+        WeatherState(
+          status: WeatherStatus.success,
+          report: cachedReport,
+          isFromCache: true,
+          failure: noInternet,
+        ),
+      ],
+    );
+
+    blocTest<WeatherCubit, WeatherState>(
       'clears the previous failure when a new attempt starts and succeeds',
       setUp: () => stubWeather(Ok(liveReport)),
       build: buildCubit,
       seed: () => showingLive.copyWith(failure: noInternet),
       act: (cubit) => cubit.refresh(),
       expect: () => [showingLive.copyWith(isRefreshing: true), showingLive],
-    );
-
-    blocTest<WeatherCubit, WeatherState>(
-      're-fetches the city that is on screen',
-      setUp: () => stubWeather(Ok(liveReport)),
-      build: buildCubit,
-      seed: () => showingLive,
-      act: (cubit) => cubit.refresh(),
-      verify: (_) => verify(
-        () => weatherRepository.getWeather(TestData.ahmedabad),
-      ).called(1),
     );
 
     blocTest<WeatherCubit, WeatherState>(
@@ -194,59 +190,50 @@ void main() {
     );
 
     blocTest<WeatherCubit, WeatherState>(
-      'reports a failed city switch without losing the current city',
-      setUp: () => stubWeather(const Err(noInternet), forCity: TestData.london),
+      'starts a new request once the previous one has finished',
+      setUp: () => stubWeather(Ok(liveReport)),
       build: buildCubit,
-      seed: () => showingLive,
-      act: (cubit) => cubit.selectCity(TestData.london),
-      expect: () => [
-        showingLive.copyWith(isRefreshing: true),
-        showingLive.copyWith(failure: noInternet),
-      ],
+      act: (cubit) async {
+        await cubit.refresh();
+        await cubit.refresh();
+      },
+      verify: (_) =>
+          verify(() => weatherRepository.getWeather(any())).called(2),
     );
-  });
 
-  group('overlapping requests', () {
     blocTest<WeatherCubit, WeatherState>(
-      'ignores a slow response that was superseded by a newer request',
+      'ignores a response that arrives after the page was closed',
       setUp: () {
-        final slowLondon = Completer<Result<WeatherReport>>();
-        when(() => weatherRepository.getWeather(TestData.london)).thenAnswer((
-          _,
-        ) {
-          // London answers only after Ahmedabad has already been shown.
-          Future<void>.delayed(
-            const Duration(milliseconds: 20),
-            () => slowLondon.complete(Ok(londonReport)),
-          );
-          return slowLondon.future;
-        });
-        stubWeather(Ok(liveReport), forCity: TestData.ahmedabad);
+        final slow = Completer<Result<WeatherReport>>();
+        when(
+          () => weatherRepository.getWeather(any()),
+        ).thenAnswer((_) => slow.future);
+        Future<void>.delayed(
+          const Duration(milliseconds: 20),
+          () => slow.complete(Ok(liveReport)),
+        );
       },
       build: buildCubit,
       act: (cubit) async {
-        unawaited(cubit.selectCity(TestData.london));
-        await cubit.selectCity(TestData.ahmedabad);
+        unawaited(cubit.refresh());
+        await cubit.close();
       },
-      wait: const Duration(milliseconds: 50),
-      expect: () => [
-        const WeatherState(status: WeatherStatus.loading),
-        showingLive,
-      ],
+      wait: const Duration(milliseconds: 40),
+      expect: () => [const WeatherState(status: WeatherStatus.loading)],
     );
   });
 
-  group('useCurrentLocation', () {
+  group('the location page', () {
     blocTest<WeatherCubit, WeatherState>(
-      'fetches weather for the resolved position',
+      'takes a GPS fix, then fetches weather for it',
       setUp: () {
         when(
           () => locationRepository.getCurrentCity(),
         ).thenAnswer((_) async => const Ok(TestData.currentLocation));
         stubWeather(Ok(TestData.report(city: TestData.currentLocation)));
       },
-      build: buildCubit,
-      act: (cubit) => cubit.useCurrentLocation(),
+      build: () => buildCubit(place: locationPage),
+      act: (cubit) => cubit.refresh(),
       expect: () => [
         const WeatherState(status: WeatherStatus.loading),
         WeatherState(
@@ -254,6 +241,9 @@ void main() {
           report: TestData.report(city: TestData.currentLocation),
         ),
       ],
+      verify: (_) => verify(
+        () => weatherRepository.getWeather(TestData.currentLocation),
+      ).called(1),
     );
 
     blocTest<WeatherCubit, WeatherState>(
@@ -261,8 +251,8 @@ void main() {
       setUp: () => when(
         () => locationRepository.getCurrentCity(),
       ).thenAnswer((_) async => const Err(permissionDenied)),
-      build: buildCubit,
-      act: (cubit) => cubit.useCurrentLocation(),
+      build: () => buildCubit(place: locationPage),
+      act: (cubit) => cubit.refresh(),
       expect: () => [
         const WeatherState(status: WeatherStatus.loading),
         const WeatherState(
@@ -274,13 +264,13 @@ void main() {
     );
 
     blocTest<WeatherCubit, WeatherState>(
-      'retries the location request when refreshing with no data yet',
+      'takes a fresh fix on every refresh',
       setUp: () => when(
         () => locationRepository.getCurrentCity(),
       ).thenAnswer((_) async => const Err(permissionDenied)),
-      build: buildCubit,
+      build: () => buildCubit(place: locationPage),
       act: (cubit) async {
-        await cubit.useCurrentLocation();
+        await cubit.refresh();
         await cubit.refresh();
       },
       verify: (_) =>
@@ -301,7 +291,7 @@ void main() {
     setUp: () => when(
       () => locationRepository.openSettings(any()),
     ).thenAnswer((_) async {}),
-    build: buildCubit,
+    build: () => buildCubit(place: locationPage),
     seed: () => const WeatherState(
       status: WeatherStatus.failure,
       failure: LocationFailure(LocationFailureReason.permissionDeniedForever),

@@ -9,6 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Material/Cupertino translations and locale data for the UI languages.
+  flutter_localizations:
+    sdk: flutter
 
   # State management (Cubit).
   flutter_bloc: ^9.1.1
@@ -25,7 +28,7 @@ dependencies:
   # Turns GPS coordinates into a place name.
   geocoding: ^5.0.0
   # Date and time formatting.
-  intl: ^0.20.3
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
@@ -38,3 +41,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Generates AppLocalizations from lib/l10n/*.arb (see l10n.yaml).
+  generate: true

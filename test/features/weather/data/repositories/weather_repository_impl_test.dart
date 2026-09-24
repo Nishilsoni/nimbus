@@ -10,6 +10,8 @@ import 'package:nimbus/features/weather/data/models/city_model.dart';
 import 'package:nimbus/features/weather/data/models/weather_model.dart';
 import 'package:nimbus/features/weather/data/models/weather_report_model.dart';
 import 'package:nimbus/features/weather/data/repositories/weather_repository_impl.dart';
+import 'package:nimbus/features/weather/domain/entities/place.dart';
+import 'package:nimbus/features/weather/domain/entities/weather_report.dart';
 
 import '../../../../fixtures/fixture_reader.dart';
 import '../../../../helpers/test_data.dart';
@@ -50,7 +52,7 @@ void main() {
       local: local,
       clock: () => TestData.fetchedAt,
     );
-    when(() => local.saveReport(any())).thenAnswer((_) async {});
+    when(() => local.saveReport(any(), any())).thenAnswer((_) async {});
   });
 
   void stubWeather(Future<WeatherModel> Function() answer) {
@@ -68,24 +70,39 @@ void main() {
 
       final result = await repository.getWeather(TestData.ahmedabad);
 
-      expect(result, isA<Ok<Object>>());
-      expect((result as Ok).value, TestData.report());
+      final report = (result as Ok<WeatherReport>).value;
+      expect(report.city, TestData.ahmedabad);
+      expect(report.fetchedAt, TestData.fetchedAt);
+      expect(report.weather, weatherModel.toEntity());
     });
 
-    test('caches the report after a successful fetch', () async {
+    test('caches the report under its place', () async {
       stubWeather(() async => weatherModel);
 
       await repository.getWeather(TestData.ahmedabad);
 
-      final saved =
-          verify(() => local.saveReport(captureAny())).captured.single
-              as WeatherReportModel;
-      expect(saved.toEntity(), TestData.report());
+      final captured = verify(
+        () => local.saveReport(captureAny(), captureAny()),
+      ).captured;
+      expect(captured.first, const CityPlace(TestData.ahmedabad).id);
+      expect((captured.last as WeatherReportModel).city.name, 'Ahmedabad');
+    });
+
+    test('caches GPS results under the location page', () async {
+      stubWeather(() async => weatherModel);
+
+      await repository.getWeather(TestData.currentLocation);
+
+      verify(
+        () => local.saveReport(const CurrentLocationPlace().id, any()),
+      ).called(1);
     });
 
     test('still succeeds when writing the cache fails', () async {
       stubWeather(() async => weatherModel);
-      when(() => local.saveReport(any())).thenThrow(Exception('disk full'));
+      when(
+        () => local.saveReport(any(), any()),
+      ).thenThrow(Exception('disk full'));
 
       final result = await repository.getWeather(TestData.ahmedabad);
 
@@ -109,7 +126,7 @@ void main() {
           final result = await repository.getWeather(TestData.ahmedabad);
 
           expect((result as Err).failure, failure);
-          verifyNever(() => local.saveReport(any()));
+          verifyNever(() => local.saveReport(any(), any()));
         },
       );
     });
@@ -123,30 +140,34 @@ void main() {
     });
   });
 
-  group('getLastReport', () {
-    test('returns the cached report as an entity', () async {
-      when(() => local.readLastReport()).thenAnswer(
-        (_) async => WeatherReportModel(
+  group('getCachedReport', () {
+    test("returns the place's cached report as an entity", () {
+      when(() => local.readReport('city-1279233')).thenReturn(
+        WeatherReportModel(
           city: CityModel.fromEntity(TestData.ahmedabad),
           weather: weatherModel,
           fetchedAt: TestData.fetchedAt,
         ),
       );
 
-      expect(await repository.getLastReport(), TestData.report());
+      final report = repository.getCachedReport(
+        const CityPlace(TestData.ahmedabad),
+      );
+
+      expect(report?.city, TestData.ahmedabad);
     });
 
-    test('returns null when nothing is cached', () async {
-      when(() => local.readLastReport()).thenAnswer((_) async => null);
+    test('returns null when nothing is cached', () {
+      when(() => local.readReport(any())).thenReturn(null);
 
-      expect(await repository.getLastReport(), isNull);
+      expect(repository.getCachedReport(const CurrentLocationPlace()), isNull);
     });
   });
 
   group('searchCities', () {
     test('returns matching cities', () async {
       when(
-        () => geocodingRemote.searchCities('Ahmedabad'),
+        () => geocodingRemote.searchCities('Ahmedabad', languageCode: 'en'),
       ).thenAnswer((_) async => [CityModel.fromEntity(TestData.ahmedabad)]);
 
       final result = await repository.searchCities('Ahmedabad');
@@ -156,7 +177,10 @@ void main() {
 
     test('fails with CityNotFoundFailure when nothing matches', () async {
       when(
-        () => geocodingRemote.searchCities('Qwzx'),
+        () => geocodingRemote.searchCities(
+          'Qwzx',
+          languageCode: any(named: 'languageCode'),
+        ),
       ).thenAnswer((_) async => []);
 
       final result = await repository.searchCities('Qwzx');
@@ -164,9 +188,24 @@ void main() {
       expect((result as Err).failure, const CityNotFoundFailure('Qwzx'));
     });
 
+    test('asks for names in the requested language', () async {
+      when(
+        () => geocodingRemote.searchCities('Delhi', languageCode: 'hi'),
+      ).thenAnswer((_) async => [CityModel.fromEntity(TestData.ahmedabad)]);
+
+      await repository.searchCities('Delhi', languageCode: 'hi');
+
+      verify(
+        () => geocodingRemote.searchCities('Delhi', languageCode: 'hi'),
+      ).called(1);
+    });
+
     test('maps network problems to failures', () async {
       when(
-        () => geocodingRemote.searchCities(any()),
+        () => geocodingRemote.searchCities(
+          any(),
+          languageCode: any(named: 'languageCode'),
+        ),
       ).thenThrow(const NoInternetException());
 
       final result = await repository.searchCities('Paris');

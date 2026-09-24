@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:nimbus/core/constants/app_strings.dart';
+import 'package:nimbus/core/l10n/l10n.dart';
 import 'package:nimbus/core/navigation/circular_reveal_route.dart';
 import 'package:nimbus/core/theme/app_text_styles.dart';
 import 'package:nimbus/core/theme/app_theme.dart';
@@ -13,9 +13,9 @@ import 'package:nimbus/features/weather/presentation/screens/weather_screen.dart
 /// the name appears letter by letter. Then the weather screen is revealed
 /// through a circle growing out of the sun.
 ///
-/// The splash doesn't pretend to load anything. The weather cubit starts
-/// reading the cache the moment the app launches, so by the time the
-/// animation ends the weather screen usually has data to show.
+/// The splash doesn't pretend to load anything: cached weather is read
+/// synchronously when the weather screen opens, so it appears on the first
+/// frame after the reveal and refreshes live from there.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -93,6 +93,12 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = context.l10n;
+    // Scales with the screen, so it fits a small phone on its side too.
+    final discSize = (MediaQuery.sizeOf(context).shortestSide * 0.52).clamp(
+      150.0,
+      240.0,
+    );
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppTheme.overlayStyleFor(palette),
       child: Scaffold(
@@ -113,19 +119,19 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
                 child: SizedBox.square(
-                  dimension: 220,
+                  dimension: discSize,
                   child: Center(
                     child: AnimatedLogo(
                       key: _logoKey,
                       progress: _logo,
-                      size: 160,
+                      size: discSize * 0.73,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 44),
+              SizedBox(height: discSize * 0.2),
               _LetterByLetter(
-                text: AppStrings.appName.toUpperCase(),
+                text: l10n.appName.toUpperCase(),
                 progress: _intro,
                 style: AppTextStyles.wordmark,
               ),
@@ -133,7 +139,7 @@ class _SplashScreenState extends State<SplashScreen>
               FadeTransition(
                 opacity: _tagline,
                 child: Text(
-                  AppStrings.appTagline,
+                  l10n.appTagline,
                   style: AppTextStyles.body.copyWith(
                     color: palette.textSecondary,
                   ),

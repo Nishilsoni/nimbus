@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:nimbus/core/constants/app_strings.dart';
+import 'package:nimbus/core/l10n/l10n.dart';
 import 'package:nimbus/core/theme/app_colors.dart';
 import 'package:nimbus/features/weather/domain/entities/weather_condition.dart';
 
 /// Labels and accent colours for each [WeatherCondition].
 extension ConditionVisuals on WeatherCondition {
-  String get label => switch (this) {
-    WeatherCondition.clear => AppStrings.conditionClear,
-    WeatherCondition.partlyCloudy => AppStrings.conditionPartlyCloudy,
-    WeatherCondition.cloudy => AppStrings.conditionCloudy,
-    WeatherCondition.fog => AppStrings.conditionFog,
-    WeatherCondition.drizzle => AppStrings.conditionDrizzle,
-    WeatherCondition.rain => AppStrings.conditionRain,
-    WeatherCondition.snow => AppStrings.conditionSnow,
-    WeatherCondition.thunderstorm => AppStrings.conditionThunderstorm,
-    WeatherCondition.unknown => AppStrings.conditionUnknown,
+  String label(AppLocalizations l10n) => switch (this) {
+    WeatherCondition.clear => l10n.conditionClear,
+    WeatherCondition.partlyCloudy => l10n.conditionPartlyCloudy,
+    WeatherCondition.cloudy => l10n.conditionCloudy,
+    WeatherCondition.fog => l10n.conditionFog,
+    WeatherCondition.drizzle => l10n.conditionDrizzle,
+    WeatherCondition.rain => l10n.conditionRain,
+    WeatherCondition.snow => l10n.conditionSnow,
+    WeatherCondition.thunderstorm => l10n.conditionThunderstorm,
+    WeatherCondition.unknown => l10n.conditionUnknown,
   };
 
   /// The accent that sets the screen's mood: warm for sun, blue for rain,

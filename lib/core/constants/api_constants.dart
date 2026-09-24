@@ -21,13 +21,31 @@ abstract final class ApiConstants {
     'is_day',
   ];
 
+  static const hourlyFields = [
+    'temperature_2m',
+    'weather_code',
+    'precipitation_probability',
+    'is_day',
+  ];
+
   static const dailyFields = [
+    'weather_code',
     'temperature_2m_max',
     'temperature_2m_min',
+    'precipitation_probability_max',
     'uv_index_max',
     'sunrise',
     'sunset',
   ];
+
+  static const forecastDays = 7;
+
+  /// The hourly forecast shows this many hours from now.
+  static const hoursShown = 24;
+
+  /// One more than [hoursShown]: the API's first slot can be the hour that
+  /// has just started, which is dropped when parsing.
+  static const forecastHours = hoursShown + 1;
 
   static const searchResultLimit = 8;
 

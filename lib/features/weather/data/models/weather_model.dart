@@ -1,5 +1,7 @@
+import 'package:nimbus/core/constants/api_constants.dart';
 import 'package:nimbus/core/utils/json_reader.dart';
 import 'package:nimbus/features/weather/data/mappers/wmo_code_mapper.dart';
+import 'package:nimbus/features/weather/data/models/forecast_models.dart';
 import 'package:nimbus/features/weather/domain/entities/weather.dart';
 
 /// The Open-Meteo forecast response, reduced to the fields we request.
@@ -12,24 +14,29 @@ class WeatherModel {
     required this.isDay,
     required this.temperature,
     required this.apparentTemperature,
-    required this.maxTemperature,
-    required this.minTemperature,
     required this.relativeHumidity,
     required this.windSpeed,
     required this.precipitation,
     required this.surfacePressure,
     required this.time,
-    this.uvIndexMax,
-    this.sunrise,
-    this.sunset,
+    required this.hourly,
+    required this.daily,
   });
 
   /// Throws [FormatException] if a required field is missing or mistyped.
   factory WeatherModel.fromJson(Map<String, dynamic> json) {
     final current = json.requireMap('current');
-    final daily = json.requireMap('daily');
-    final sunrise = daily.firstOf<String>('sunrise');
-    final sunset = daily.firstOf<String>('sunset');
+    final time = current.requireDateTime('time');
+    final daily = DailyModel.listFromJson(json.requireMap('daily'));
+    if (daily.isEmpty) throw const FormatException('Missing daily forecast');
+
+    // The first hourly slot can be the hour that has already started;
+    // keep the forecast strictly from the current hour onwards.
+    final currentHour = DateTime(time.year, time.month, time.day, time.hour);
+    final hourly = HourlyModel.listFromJson(json.requireMap('hourly'))
+        .where((hour) => !hour.time.isBefore(currentHour))
+        .take(ApiConstants.hoursShown)
+        .toList(growable: false);
 
     return WeatherModel(
       weatherCode: current.requireInt('weather_code'),
@@ -40,12 +47,9 @@ class WeatherModel {
       windSpeed: current.requireDouble('wind_speed_10m'),
       precipitation: current.requireDouble('precipitation'),
       surfacePressure: current.requireDouble('surface_pressure'),
-      time: current.requireDateTime('time'),
-      maxTemperature: _requireFirst(daily, 'temperature_2m_max'),
-      minTemperature: _requireFirst(daily, 'temperature_2m_min'),
-      uvIndexMax: daily.firstOf<num>('uv_index_max')?.toDouble(),
-      sunrise: sunrise == null ? null : DateTime.parse(sunrise),
-      sunset: sunset == null ? null : DateTime.parse(sunset),
+      time: time,
+      hourly: hourly,
+      daily: daily,
     );
   }
 
@@ -53,16 +57,15 @@ class WeatherModel {
   final bool isDay;
   final double temperature;
   final double apparentTemperature;
-  final double maxTemperature;
-  final double minTemperature;
   final int relativeHumidity;
   final double windSpeed;
   final double precipitation;
   final double surfacePressure;
   final DateTime time;
-  final double? uvIndexMax;
-  final DateTime? sunrise;
-  final DateTime? sunset;
+  final List<HourlyModel> hourly;
+
+  /// Seven days; the first is today and provides today's highs and lows.
+  final List<DailyModel> daily;
 
   Map<String, dynamic> toJson() => {
     'current': {
@@ -76,35 +79,29 @@ class WeatherModel {
       'surface_pressure': surfacePressure,
       'is_day': isDay ? 1 : 0,
     },
-    'daily': {
-      'temperature_2m_max': [maxTemperature],
-      'temperature_2m_min': [minTemperature],
-      'uv_index_max': [uvIndexMax],
-      'sunrise': [sunrise?.toIso8601String()],
-      'sunset': [sunset?.toIso8601String()],
-    },
+    'hourly': HourlyModel.listToJson(hourly),
+    'daily': DailyModel.listToJson(daily),
   };
 
-  Weather toEntity() => Weather(
-    condition: WmoCodeMapper.toCondition(weatherCode),
-    isDay: isDay,
-    temperature: temperature,
-    feelsLike: apparentTemperature,
-    highTemperature: maxTemperature,
-    lowTemperature: minTemperature,
-    humidity: relativeHumidity,
-    windSpeed: windSpeed,
-    precipitation: precipitation,
-    pressure: surfacePressure,
-    observedAt: time,
-    uvIndex: uvIndexMax,
-    sunrise: sunrise,
-    sunset: sunset,
-  );
-
-  static double _requireFirst(Map<String, dynamic> daily, String key) {
-    final value = daily.firstOf<num>(key);
-    if (value == null) throw FormatException('Missing "$key[0]"');
-    return value.toDouble();
+  Weather toEntity() {
+    final today = daily.first;
+    return Weather(
+      condition: WmoCodeMapper.toCondition(weatherCode),
+      isDay: isDay,
+      temperature: temperature,
+      feelsLike: apparentTemperature,
+      highTemperature: today.maxTemperature,
+      lowTemperature: today.minTemperature,
+      humidity: relativeHumidity,
+      windSpeed: windSpeed,
+      precipitation: precipitation,
+      pressure: surfacePressure,
+      observedAt: time,
+      uvIndex: today.uvIndexMax,
+      sunrise: today.sunrise,
+      sunset: today.sunset,
+      hourly: [for (final hour in hourly) hour.toEntity()],
+      daily: [for (final day in daily) day.toEntity()],
+    );
   }
 }

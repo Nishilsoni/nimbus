@@ -14,6 +14,7 @@ class CityResultTile extends StatelessWidget {
     required this.onTap,
     this.subtitle,
     this.leading,
+    this.trailing,
   });
 
   /// A search result, led by the country's flag.
@@ -21,6 +22,7 @@ class CityResultTile extends StatelessWidget {
     Key? key,
     required City city,
     required VoidCallback onTap,
+    Widget? trailing,
   }) {
     final flag = countryFlag(city.countryCode);
     return CityResultTile(
@@ -31,6 +33,7 @@ class CityResultTile extends StatelessWidget {
           ? null
           : Text(flag, style: const TextStyle(fontSize: 22)),
       onTap: onTap,
+      trailing: trailing,
     );
   }
 
@@ -40,6 +43,9 @@ class CityResultTile extends StatelessWidget {
   /// Defaults to a city icon.
   final Widget? leading;
   final VoidCallback onTap;
+
+  /// Defaults to a chevron; e.g. a remove button in the places list.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +89,8 @@ class CityResultTile extends StatelessWidget {
               ],
             ),
           ),
-          Icon(Icons.chevron_right_rounded, color: palette.textMuted),
+          trailing ??
+              Icon(Icons.chevron_right_rounded, color: palette.textMuted),
         ],
       ),
     );

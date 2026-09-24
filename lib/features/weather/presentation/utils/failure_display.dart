@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:nimbus/core/constants/app_strings.dart';
 import 'package:nimbus/core/error/failures.dart';
+import 'package:nimbus/core/l10n/l10n.dart';
 
-/// What the user can do about a failure.
-enum FailureAction { retry, retryLocation, openSettings }
+/// What the user can do about a failure. Retrying the location page takes
+/// a fresh GPS fix, so "retry" covers location problems too.
+enum FailureAction { retry, openSettings }
 
 /// How each [Failure] is presented. Kept in the presentation layer so the
 /// domain's failures stay free of icons and copy.
@@ -21,39 +22,36 @@ extension FailureDisplay on Failure {
     UnknownFailure() => Icons.error_outline_rounded,
   };
 
-  String get title => switch (this) {
-    NoInternetFailure() => AppStrings.noInternetTitle,
-    TimeoutFailure() => AppStrings.timeoutTitle,
-    RateLimitFailure() => AppStrings.rateLimitTitle,
-    CityNotFoundFailure() => AppStrings.cityNotFoundTitle,
-    ServerFailure() => AppStrings.serverTitle,
+  String title(AppLocalizations l10n) => switch (this) {
+    NoInternetFailure() => l10n.noInternetTitle,
+    TimeoutFailure() => l10n.timeoutTitle,
+    RateLimitFailure() => l10n.rateLimitTitle,
+    CityNotFoundFailure() => l10n.cityNotFoundTitle,
+    ServerFailure() => l10n.serverTitle,
     LocationFailure(:final reason) => switch (reason) {
-      LocationFailureReason.serviceDisabled => AppStrings.locationDisabledTitle,
-      LocationFailureReason.permissionDenied => AppStrings.locationDeniedTitle,
+      LocationFailureReason.serviceDisabled => l10n.locationDisabledTitle,
+      LocationFailureReason.permissionDenied => l10n.locationDeniedTitle,
       LocationFailureReason.permissionDeniedForever =>
-        AppStrings.locationBlockedTitle,
-      LocationFailureReason.unavailable => AppStrings.locationUnavailableTitle,
+        l10n.locationBlockedTitle,
+      LocationFailureReason.unavailable => l10n.locationUnavailableTitle,
     },
-    UnknownFailure() => AppStrings.unknownTitle,
+    UnknownFailure() => l10n.unknownTitle,
   };
 
-  String get message => switch (this) {
-    NoInternetFailure() => AppStrings.noInternetMessage,
-    TimeoutFailure() => AppStrings.timeoutMessage,
-    RateLimitFailure() => AppStrings.rateLimitMessage,
-    CityNotFoundFailure(:final query) => AppStrings.cityNotFoundMessage(query),
-    ServerFailure() => AppStrings.serverMessage,
+  String message(AppLocalizations l10n) => switch (this) {
+    NoInternetFailure() => l10n.noInternetMessage,
+    TimeoutFailure() => l10n.timeoutMessage,
+    RateLimitFailure() => l10n.rateLimitMessage,
+    CityNotFoundFailure(:final query) => l10n.cityNotFoundMessage(query),
+    ServerFailure() => l10n.serverMessage,
     LocationFailure(:final reason) => switch (reason) {
-      LocationFailureReason.serviceDisabled =>
-        AppStrings.locationDisabledMessage,
-      LocationFailureReason.permissionDenied =>
-        AppStrings.locationDeniedMessage,
+      LocationFailureReason.serviceDisabled => l10n.locationDisabledMessage,
+      LocationFailureReason.permissionDenied => l10n.locationDeniedMessage,
       LocationFailureReason.permissionDeniedForever =>
-        AppStrings.locationBlockedMessage,
-      LocationFailureReason.unavailable =>
-        AppStrings.locationUnavailableMessage,
+        l10n.locationBlockedMessage,
+      LocationFailureReason.unavailable => l10n.locationUnavailableMessage,
     },
-    UnknownFailure() => AppStrings.unknownMessage,
+    UnknownFailure() => l10n.unknownMessage,
   };
 
   FailureAction get action => switch (this) {
@@ -62,12 +60,11 @@ extension FailureDisplay on Failure {
           LocationFailureReason.permissionDeniedForever,
     ) =>
       FailureAction.openSettings,
-    LocationFailure() => FailureAction.retryLocation,
     _ => FailureAction.retry,
   };
 
-  String get actionLabel => switch (action) {
-    FailureAction.openSettings => AppStrings.openSettings,
-    FailureAction.retry || FailureAction.retryLocation => AppStrings.tryAgain,
+  String actionLabel(AppLocalizations l10n) => switch (action) {
+    FailureAction.openSettings => l10n.openSettings,
+    FailureAction.retry => l10n.tryAgain,
   };
 }

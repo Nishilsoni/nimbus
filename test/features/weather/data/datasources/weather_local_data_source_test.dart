@@ -16,35 +16,40 @@ void main() {
     return WeatherLocalDataSource(await SharedPreferences.getInstance());
   }
 
+  WeatherReportModel reportFor(CityModel city) => WeatherReportModel(
+    city: city,
+    weather: WeatherModel.fromJson(jsonFixture('forecast_response.json')),
+    fetchedAt: TestData.fetchedAt,
+  );
+
   test('returns null when nothing has been cached', () async {
     final dataSource = await createDataSource();
 
-    expect(await dataSource.readLastReport(), isNull);
+    expect(dataSource.readReport('city-1'), isNull);
   });
 
-  test('reads back the report it saved', () async {
+  test('keeps a separate report for each place', () async {
     final dataSource = await createDataSource();
-    final report = WeatherReportModel(
-      city: CityModel.fromEntity(TestData.ahmedabad),
-      weather: WeatherModel.fromJson(jsonFixture('forecast_response.json')),
-      fetchedAt: TestData.fetchedAt,
-    );
+    final ahmedabad = reportFor(CityModel.fromEntity(TestData.ahmedabad));
+    final london = reportFor(CityModel.fromEntity(TestData.london));
 
-    await dataSource.saveReport(report);
-    final restored = await dataSource.readLastReport();
+    await dataSource.saveReport('ahmedabad', ahmedabad);
+    await dataSource.saveReport('london', london);
 
-    expect(restored?.toEntity(), TestData.report());
+    expect(dataSource.readReport('ahmedabad')?.city.name, 'Ahmedabad');
+    expect(dataSource.readReport('london')?.city.name, 'London');
   });
 
   test('discards a corrupt entry instead of crashing', () async {
     final dataSource = await createDataSource({
-      WeatherLocalDataSource.lastReportKey: '{"city": "not an object"',
+      WeatherLocalDataSource.keyFor('broken'): '{"city": "not an object"',
     });
 
-    expect(await dataSource.readLastReport(), isNull);
+    expect(dataSource.readReport('broken'), isNull);
+    await pumpEventQueue();
     final preferences = await SharedPreferences.getInstance();
     expect(
-      preferences.containsKey(WeatherLocalDataSource.lastReportKey),
+      preferences.containsKey(WeatherLocalDataSource.keyFor('broken')),
       isFalse,
     );
   });

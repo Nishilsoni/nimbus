@@ -13,12 +13,16 @@ import 'package:nimbus/features/weather/presentation/cubit/city_search_state.dar
 class CitySearchCubit extends Cubit<CitySearchState> {
   CitySearchCubit({
     required WeatherRepository weatherRepository,
+    this.languageCode = 'en',
     this.debounceDuration = const Duration(milliseconds: 400),
   }) : _weatherRepository = weatherRepository,
        super(const CitySearchState());
 
   final WeatherRepository _weatherRepository;
   final Duration debounceDuration;
+
+  /// Results are named in this language where the provider can.
+  final String languageCode;
 
   Timer? _debounce;
   int _latestSearch = 0;
@@ -54,7 +58,10 @@ class CitySearchCubit extends Cubit<CitySearchState> {
       ),
     );
 
-    final result = await _weatherRepository.searchCities(query);
+    final result = await _weatherRepository.searchCities(
+      query,
+      languageCode: languageCode,
+    );
     if (isClosed || serial != _latestSearch) return;
 
     emit(switch (result) {

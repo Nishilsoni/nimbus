@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:nimbus/core/constants/app_strings.dart';
+import 'package:nimbus/core/l10n/l10n.dart';
 import 'package:nimbus/core/widgets/status_message.dart';
 import 'package:nimbus/core/widgets/tactile/tactile_button.dart';
 import 'package:nimbus/core/widgets/tactile/tactile_surface.dart';
@@ -19,6 +19,7 @@ class EmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return StatusMessage(
       visual: const TactileSurface(
         circle: true,
@@ -34,17 +35,17 @@ class EmptyView extends StatelessWidget {
           ),
         ),
       ),
-      title: AppStrings.welcomeTitle,
-      message: AppStrings.welcomeMessage,
+      title: l10n.welcomeTitle,
+      message: l10n.welcomeMessage,
       actions: [
         TactileButton(
-          label: AppStrings.searchCity,
+          label: l10n.searchCity,
           icon: Icons.search_rounded,
           onPressed: onSearch,
           isPrimary: true,
         ),
         TactileButton(
-          label: AppStrings.useMyLocation,
+          label: l10n.useMyLocation,
           icon: Icons.my_location_rounded,
           onPressed: onUseLocation,
         ),

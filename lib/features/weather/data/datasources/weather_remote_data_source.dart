@@ -18,9 +18,11 @@ class WeatherRemoteDataSource {
           'latitude': '$latitude',
           'longitude': '$longitude',
           'current': ApiConstants.currentFields.join(','),
+          'hourly': ApiConstants.hourlyFields.join(','),
           'daily': ApiConstants.dailyFields.join(','),
           'timezone': 'auto',
-          'forecast_days': '1',
+          'forecast_days': '${ApiConstants.forecastDays}',
+          'forecast_hours': '${ApiConstants.forecastHours}',
         });
 
     final json = await _apiClient.getJson(uri);

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:nimbus/core/constants/app_strings.dart';
 import 'package:nimbus/core/error/failures.dart';
+import 'package:nimbus/core/l10n/l10n.dart';
 import 'package:nimbus/core/theme/app_text_styles.dart';
 import 'package:nimbus/core/theme/surface_palette.dart';
 import 'package:nimbus/core/widgets/relative_time_text.dart';
@@ -26,6 +26,7 @@ class RefreshStatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final palette = context.palette;
     return Semantics(
       liveRegion: true,
@@ -48,10 +49,10 @@ class RefreshStatusBanner extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(failure.title, style: AppTextStyles.bodyStrong),
+                  Text(failure.title(l10n), style: AppTextStyles.bodyStrong),
                   RelativeTimeText(
                     time: lastUpdated,
-                    builder: AppStrings.lastUpdated,
+                    builder: l10n.lastUpdated,
                     style: AppTextStyles.caption.copyWith(
                       color: palette.textSecondary,
                     ),
@@ -61,14 +62,14 @@ class RefreshStatusBanner extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             TactileButton(
-              label: failure.actionLabel,
+              label: failure.actionLabel(l10n),
               onPressed: onAction,
               isCompact: true,
             ),
             const SizedBox(width: 10),
             TactileIconButton(
               icon: Icons.close_rounded,
-              tooltip: AppStrings.dismiss,
+              tooltip: l10n.dismiss,
               onPressed: onDismiss,
               size: 32,
             ),
